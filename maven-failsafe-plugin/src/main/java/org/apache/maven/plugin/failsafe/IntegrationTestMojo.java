@@ -40,7 +40,7 @@ import org.apache.maven.surefire.suite.RunResult;
 import static org.apache.maven.shared.utils.io.IOUtil.close;
 
 /**
- * Run integration tests using Surefire.
+ * Run integration tests using Failsafe.
  *
  * @author Jason van Zyl
  * @author Stephen Connolly
@@ -139,7 +139,7 @@ public class IntegrationTestMojo
 
     /**
      * Stop executing queued parallel JUnit tests after a certain number of seconds.
-     * <br/>
+     * <br/>    
      * Example values: "3.5", "4"<br/>
      * <br/>
      * If set to 0, wait forever, never timing out.

@@ -419,6 +419,14 @@ public abstract class AbstractSurefireMojo
      */
     @Parameter( property = "testNGArtifactName", defaultValue = "org.testng:testng" )
     protected String testNGArtifactName;
+    
+    /**
+     * When true, the default TestNG listeners will be added.
+     * 
+     * @since 2.8
+     */
+    @Parameter( property = "useDefaultListeners", defaultValue = "true")
+    protected boolean useDefaultListeners;
 
     /**
      * (TestNG/JUnit 4.7 provider) The attribute thread-count allows you to specify how many threads should be

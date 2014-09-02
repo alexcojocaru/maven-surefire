@@ -39,7 +39,7 @@ import org.apache.maven.shared.utils.io.IOUtil;
 import org.apache.maven.surefire.suite.RunResult;
 
 /**
- * Verify integration tests ran using Surefire.
+ * Verify integration tests ran using Failsafe.
  *
  * @author Stephen Connolly
  * @author Jason van Zyl

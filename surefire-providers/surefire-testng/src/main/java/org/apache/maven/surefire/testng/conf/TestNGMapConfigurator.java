@@ -50,6 +50,11 @@ public class TestNGMapConfigurator
         throws TestSetFailedException
     {
         Map convertedOptions = getConvertedOptions( options );
+        for (Object key : convertedOptions.keySet())
+        {
+            String keyAsString = (String)key;
+            System.out.println("Key: " + keyAsString + ", value=" + convertedOptions.get(key).toString());
+        }
         testng.configure( convertedOptions );
     }
 
