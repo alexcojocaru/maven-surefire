@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
@@ -36,6 +37,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.maven.plugin.logging.Log;
 import org.apache.maven.plugin.surefire.AbstractSurefireMojo;
@@ -64,6 +66,7 @@ import org.apache.maven.surefire.booter.SystemPropertyManager;
 import org.apache.maven.surefire.providerapi.SurefireProvider;
 import org.apache.maven.surefire.report.StackTraceWriter;
 import org.apache.maven.surefire.suite.RunResult;
+import org.apache.maven.surefire.testset.TestRequest;
 import org.apache.maven.surefire.util.DefaultScanResult;
 
 import static org.apache.maven.surefire.booter.Classpath.join;
@@ -87,29 +90,29 @@ public class ForkStarter
     /**
      * Closes an InputStream
      */
-    private final class InputStreamCloser
+    private static class InputStreamCloser
         implements Runnable
     {
-        private InputStream testProvidingInputStream;
+        private final AtomicReference<InputStream> testProvidingInputStream;
 
         public InputStreamCloser( InputStream testProvidingInputStream )
         {
-            this.testProvidingInputStream = testProvidingInputStream;
+            this.testProvidingInputStream = new AtomicReference<InputStream>( testProvidingInputStream );
         }
 
-        public synchronized void run()
+        public void run()
         {
-            if ( testProvidingInputStream != null )
+            InputStream stream = testProvidingInputStream.getAndSet( null );
+            if ( stream != null )
             {
                 try
                 {
-                    testProvidingInputStream.close();
+                    stream.close();
                 }
                 catch ( IOException e )
                 {
                     // ignore
                 }
-                testProvidingInputStream = null;
             }
         }
     }
@@ -124,11 +127,11 @@ public class ForkStarter
 
     private final StartupReportConfiguration startupReportConfiguration;
 
-    private Log log;
+    private final Log log;
 
     private final DefaultReporterFactory defaultReporterFactory;
 
-    private final List<DefaultReporterFactory> defaultReporterFactoryList;
+    private final Collection<DefaultReporterFactory> defaultReporterFactoryList;
 
     private static volatile int systemPropertiesFileCounter = 0;
 
@@ -143,7 +146,8 @@ public class ForkStarter
         this.startupReportConfiguration = startupReportConfiguration;
         this.log = log;
         defaultReporterFactory = new DefaultReporterFactory( startupReportConfiguration );
-        defaultReporterFactoryList = new ArrayList<DefaultReporterFactory>();
+        defaultReporterFactory.runStarting();
+        defaultReporterFactoryList = new ConcurrentLinkedQueue<DefaultReporterFactory>();
     }
 
     public RunResult run( SurefireProperties effectiveSystemProperties, DefaultScanResult scanResult )
@@ -177,7 +181,7 @@ public class ForkStarter
         }
         finally
         {
-            defaultReporterFactory.mergeFromOtherFactories(defaultReporterFactoryList);
+            defaultReporterFactory.mergeFromOtherFactories( defaultReporterFactoryList );
             defaultReporterFactory.close();
         }
         return result;
@@ -185,9 +189,17 @@ public class ForkStarter
 
     private boolean isForkOnce()
     {
-        return forkConfiguration.isReuseForks() && 1 == forkConfiguration.getForkCount();
+        return forkConfiguration.isReuseForks() && ( 1 == forkConfiguration.getForkCount() || hasSuiteXmlFiles() );
     }
 
+    private boolean hasSuiteXmlFiles()
+    {
+        TestRequest testSuiteDefinition = providerConfiguration.getTestSuiteDefinition();
+        return testSuiteDefinition != null && testSuiteDefinition.getSuiteXmlFiles() != null
+            && !testSuiteDefinition.getSuiteXmlFiles().isEmpty();
+    }
+
+    @SuppressWarnings( "checkstyle:magicnumber" )
     private RunResult runSuitesForkOnceMultiple( final SurefireProperties effectiveSystemProperties, int forkCount )
         throws SurefireBooterForkException
     {
@@ -272,6 +284,7 @@ public class ForkStarter
 
     }
 
+    @SuppressWarnings( "checkstyle:magicnumber" )
     private RunResult runSuitesForkPerTestSet( final SurefireProperties effectiveSystemProperties, final int forkCount )
         throws SurefireBooterForkException
     {
@@ -296,8 +309,9 @@ public class ForkStarter
                         DefaultReporterFactory forkedReporterFactory =
                             new DefaultReporterFactory( startupReportConfiguration );
                         defaultReporterFactoryList.add( forkedReporterFactory );
-                        ForkClient forkClient = new ForkClient( forkedReporterFactory,
-                                                                startupReportConfiguration.getTestVmSystemProperties() );
+                        ForkClient forkClient =
+                                        new ForkClient( forkedReporterFactory,
+                                                        startupReportConfiguration.getTestVmSystemProperties() );
                         return fork( testSet, new PropertiesWrapper( providerConfiguration.getProviderProperties() ),
                                      forkClient, effectiveSystemProperties, null );
                     }
@@ -339,6 +353,7 @@ public class ForkStarter
 
     }
 
+    @SuppressWarnings( "checkstyle:magicnumber" )
     private void closeExecutor( ExecutorService executorService )
         throws SurefireBooterForkException
     {
@@ -469,7 +484,8 @@ public class ForkStarter
         }
         catch ( CommandLineException e )
         {
-            runResult = RunResult.failure( forkClient.getDefaultReporterFactory().getGlobalRunStatistics().getRunResult(), e );
+            runResult =
+                RunResult.failure( forkClient.getDefaultReporterFactory().getGlobalRunStatistics().getRunResult(), e );
             throw new SurefireBooterForkException( "Error while executing forked tests.", e.getCause() );
         }
         finally

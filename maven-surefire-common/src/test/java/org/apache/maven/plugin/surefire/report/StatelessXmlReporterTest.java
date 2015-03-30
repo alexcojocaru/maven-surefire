@@ -21,6 +21,7 @@ package org.apache.maven.plugin.surefire.report;
 
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase;
+
 import org.apache.maven.plugin.surefire.booterclient.output.DeserializedStacktraceWriter;
 import org.apache.maven.shared.utils.StringUtils;
 import org.apache.maven.shared.utils.xml.Xpp3Dom;
@@ -34,13 +35,18 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @SuppressWarnings( "ResultOfMethodCallIgnored" )
 public class StatelessXmlReporterTest
     extends TestCase
 {
 
-    private StatelessXmlReporter reporter = new StatelessXmlReporter( new File( "." ), null, false, 0 );
+    private StatelessXmlReporter reporter = new StatelessXmlReporter( new File( "." ), null, false, 0,
+                    Collections.synchronizedMap( new HashMap<String, Map<String, List<WrappedReportEntry>>>() ) );
 
     private ReportEntry reportEntry;
 
@@ -82,7 +88,7 @@ public class StatelessXmlReporterTest
         String testName = "org.apache.maven.plugin.surefire.report.StatelessXMLReporterTest";
         reportEntry = new SimpleReportEntry( this.getClass().getName(), testName, 12 );
         WrappedReportEntry testSetReportEntry =
-            new WrappedReportEntry( reportEntry, ReportEntryType.success, 12, null, null );
+            new WrappedReportEntry( reportEntry, ReportEntryType.SUCCESS, 12, null, null );
         stats.testSucceeded( testSetReportEntry );
         reporter.testSetCompleted( testSetReportEntry, stats );
 
@@ -99,7 +105,7 @@ public class StatelessXmlReporterTest
 
         reportEntry = new SimpleReportEntry( this.getClass().getName(), TEST_ONE, 12 );
         WrappedReportEntry testSetReportEntry =
-            new WrappedReportEntry( reportEntry, ReportEntryType.success, 12, null, null );
+            new WrappedReportEntry( reportEntry, ReportEntryType.SUCCESS, 12, null, null );
         expectedReportFile = new File( reportDir, "TEST-" + TEST_ONE + ".xml" );
 
         stats.testSucceeded( testSetReportEntry );
@@ -128,10 +134,11 @@ public class StatelessXmlReporterTest
         stdErr.write( stdErrBytes, 0, stdErrBytes.length );
         WrappedReportEntry t2 =
             new WrappedReportEntry( new SimpleReportEntry( Inner.class.getName(), TEST_TWO, stackTraceWriter, 13 ),
-                                    ReportEntryType.error, 13, stdOut, stdErr );
+                                    ReportEntryType.ERROR, 13, stdOut, stdErr );
 
         stats.testSucceeded( t2 );
-        StatelessXmlReporter reporter = new StatelessXmlReporter( new File( "." ), null, false, 0 );
+        StatelessXmlReporter reporter = new StatelessXmlReporter( new File( "." ), null, false, 0,
+                        Collections.synchronizedMap( new HashMap<String, Map<String, List<WrappedReportEntry>>>() ) );
         reporter.testSetCompleted( testSetReportEntry, stats );
 
         FileInputStream fileInputStream = new FileInputStream( expectedReportFile );
@@ -171,7 +178,7 @@ public class StatelessXmlReporterTest
         reportEntry = new SimpleReportEntry( this.getClass().getName(), TEST_ONE, 12 );
 
         WrappedReportEntry testSetReportEntry =
-            new WrappedReportEntry( reportEntry, ReportEntryType.success, 12, null, null );
+            new WrappedReportEntry( reportEntry, ReportEntryType.SUCCESS, 12, null, null );
         expectedReportFile = new File( reportDir, "TEST-" + TEST_ONE + ".xml" );
 
         stats.testSucceeded( testSetReportEntry );
@@ -187,22 +194,22 @@ public class StatelessXmlReporterTest
 
         WrappedReportEntry testTwoFirstError =
             new WrappedReportEntry( new SimpleReportEntry( Inner.class.getName(), TEST_TWO, stackTraceWriterOne, 5 ),
-                                    ReportEntryType.error, 5, createStdOutput( firstRunOut ),
+                                    ReportEntryType.ERROR, 5, createStdOutput( firstRunOut ),
                                     createStdOutput( firstRunErr ) );
 
         WrappedReportEntry testTwoSecondError =
             new WrappedReportEntry( new SimpleReportEntry( Inner.class.getName(), TEST_TWO, stackTraceWriterTwo, 13 ),
-                                    ReportEntryType.error, 13, createStdOutput( secondRunOut ),
+                                    ReportEntryType.ERROR, 13, createStdOutput( secondRunOut ),
                                     createStdOutput( secondRunErr ) );
 
         WrappedReportEntry testThreeFirstRun =
             new WrappedReportEntry( new SimpleReportEntry( Inner.class.getName(), TEST_THREE, stackTraceWriterOne, 13 ),
-                                    ReportEntryType.failure, 13, createStdOutput( firstRunOut ),
+                                    ReportEntryType.FAILURE, 13, createStdOutput( firstRunOut ),
                                     createStdOutput( firstRunErr ) );
 
         WrappedReportEntry testThreeSecondRun =
             new WrappedReportEntry( new SimpleReportEntry( Inner.class.getName(), TEST_THREE, stackTraceWriterTwo, 2 ),
-                                    ReportEntryType.success, 2, createStdOutput( secondRunOut ),
+                                    ReportEntryType.SUCCESS, 2, createStdOutput( secondRunOut ),
                                     createStdOutput( secondRunErr ) );
 
         stats.testSucceeded( testTwoFirstError );
@@ -210,7 +217,14 @@ public class StatelessXmlReporterTest
         rerunStats.testSucceeded( testTwoSecondError );
         rerunStats.testSucceeded( testThreeSecondRun );
 
-        StatelessXmlReporter reporter = new StatelessXmlReporter( new File( "." ), null, false, 1 );
+        StatelessXmlReporter reporter =
+            new StatelessXmlReporter(
+                                      new File( "." ),
+                                      null,
+                                      false,
+                                      1,
+                                      new HashMap<String, Map<String, List<WrappedReportEntry>>>() );
+
         reporter.testSetCompleted( testSetReportEntry, stats );
         reporter.testSetCompleted( testSetReportEntry, rerunStats );
 

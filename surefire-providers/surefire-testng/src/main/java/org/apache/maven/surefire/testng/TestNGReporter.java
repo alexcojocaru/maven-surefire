@@ -31,7 +31,6 @@ import org.testng.ISuiteListener;
 import org.testng.ITestContext;
 import org.testng.ITestListener;
 import org.testng.ITestResult;
-import org.testng.TestNG;
 
 /**
  * Listens for and provides and adaptor layer so that
@@ -126,7 +125,7 @@ public class TestNGReporter
                                                                   result.getMethod().getMethodName(),
                                                                   result.getThrowable() ) );
 
-        reporter.testError( report );
+        reporter.testSucceeded( report );
     }
 
     public void onStart( ITestContext context )

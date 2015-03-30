@@ -19,6 +19,8 @@ package org.apache.maven.surefire.junitcore.pc;
  * under the License.
  */
 
+import org.apache.maven.surefire.report.ConsoleLogger;
+
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
@@ -32,9 +34,9 @@ import java.util.concurrent.TimeUnit;
 final class NonSharedThreadPoolStrategy
     extends AbstractThreadPoolStrategy
 {
-    NonSharedThreadPoolStrategy( ExecutorService threadPool )
+    NonSharedThreadPoolStrategy( ConsoleLogger logger, ExecutorService threadPool )
     {
-        super( threadPool );
+        super( logger, threadPool );
     }
 
     @Override
@@ -47,16 +49,9 @@ final class NonSharedThreadPoolStrategy
     public boolean finished()
         throws InterruptedException
     {
-        boolean wasRunning = canSchedule();
+        boolean wasRunning = disable();
         getThreadPool().shutdown();
-        try
-        {
-            getThreadPool().awaitTermination( Long.MAX_VALUE, TimeUnit.NANOSECONDS );
-            return wasRunning;
-        }
-        finally
-        {
-            disable();
-        }
+        getThreadPool().awaitTermination( Long.MAX_VALUE, TimeUnit.NANOSECONDS );
+        return wasRunning;
     }
 }

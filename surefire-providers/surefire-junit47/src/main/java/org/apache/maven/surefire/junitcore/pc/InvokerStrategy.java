@@ -19,7 +19,10 @@ package org.apache.maven.surefire.junitcore.pc;
  * under the License.
  */
 
-import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.maven.surefire.report.ConsoleLogger;
+
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  * The sequentially executing strategy in private package.
@@ -31,21 +34,48 @@ import java.util.concurrent.atomic.AtomicBoolean;
 final class InvokerStrategy
     extends SchedulingStrategy
 {
-    private final AtomicBoolean canSchedule = new AtomicBoolean( true );
+
+    private final Queue<Thread> activeThreads = new ConcurrentLinkedQueue<Thread>();
+
+    protected InvokerStrategy( ConsoleLogger logger )
+    {
+        super( logger );
+    }
 
     @Override
     public void schedule( Runnable task )
     {
         if ( canSchedule() )
         {
-            task.run();
+            final Thread currentThread = Thread.currentThread();
+            try
+            {
+                activeThreads.add( currentThread );
+                task.run();
+            }
+            finally
+            {
+                activeThreads.remove( currentThread );
+            }
         }
     }
 
     @Override
     protected boolean stop()
     {
-        return canSchedule.getAndSet( false );
+        return disable();
+    }
+
+    @Override
+    protected boolean stopNow()
+    {
+        final boolean stopped = disable();
+
+        for ( Thread activeThread = activeThreads.poll(); activeThread != null; activeThread = activeThreads.poll() )
+        {
+            activeThread.interrupt();
+        }
+        return stopped;
     }
 
     @Override
@@ -55,14 +85,13 @@ final class InvokerStrategy
     }
 
     @Override
-    public boolean canSchedule()
-    {
-        return canSchedule.get();
-    }
-
-    @Override
     public boolean finished()
         throws InterruptedException
+    {
+        return disable();
+    }
+
+    public boolean destroy()
     {
         return stop();
     }

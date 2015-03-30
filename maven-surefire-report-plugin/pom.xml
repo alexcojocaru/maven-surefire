@@ -24,7 +24,7 @@
   <parent>
     <groupId>org.apache.maven.surefire</groupId>
     <artifactId>surefire</artifactId>
-    <version>2.18-dalvizu</version>
+    <version>2.18.1-dalvizu</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
 
@@ -47,7 +47,7 @@
   </prerequisites>
 
   <properties>
-    <doxiaVersion>1.1.4</doxiaVersion>
+    <doxiaVersion>1.4</doxiaVersion>
   </properties>
 
   <dependencies>
@@ -84,12 +84,11 @@
     <dependency>
       <groupId>org.apache.maven.reporting</groupId>
       <artifactId>maven-reporting-api</artifactId>
-      <version>3.0</version>
     </dependency>
     <dependency>
       <groupId>org.apache.maven.reporting</groupId>
       <artifactId>maven-reporting-impl</artifactId>
-      <version>2.1</version>
+      <version>2.3</version>
     </dependency>
 
     <!-- doxia -->
@@ -137,7 +136,6 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-plugin-plugin</artifactId>
-        <version>3.2</version>
         <configuration>
           <goalPrefix>surefire-report</goalPrefix>
           <skipErrorNoDescriptorsFound>true</skipErrorNoDescriptorsFound>
@@ -232,6 +230,20 @@
                 <locale>sv</locale>
               </locales>
             </configuration>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-changes-plugin</artifactId>
+            <configuration>
+              <skip>false</skip>
+            </configuration>
+            <reportSets>
+              <reportSet>
+                <reports>
+                  <report>jira-report</report>
+                </reports>
+              </reportSet>
+            </reportSets>
           </plugin>
         </plugins>
       </reporting>

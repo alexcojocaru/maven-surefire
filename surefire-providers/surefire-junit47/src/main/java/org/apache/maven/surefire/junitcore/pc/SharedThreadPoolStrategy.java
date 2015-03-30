@@ -19,6 +19,8 @@ package org.apache.maven.surefire.junitcore.pc;
  * under the License.
  */
 
+import org.apache.maven.surefire.report.ConsoleLogger;
+
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
@@ -35,9 +37,9 @@ import java.util.concurrent.Future;
 final class SharedThreadPoolStrategy
     extends AbstractThreadPoolStrategy
 {
-    SharedThreadPoolStrategy( ExecutorService threadPool )
+    SharedThreadPoolStrategy( ConsoleLogger logger, ExecutorService threadPool )
     {
-        super( threadPool, new ConcurrentLinkedQueue<Future<?>>() );
+        super( logger, threadPool, new ConcurrentLinkedQueue<Future<?>>() );
     }
 
     @Override
@@ -50,7 +52,7 @@ final class SharedThreadPoolStrategy
     public boolean finished()
         throws InterruptedException
     {
-        boolean wasRunningAll = canSchedule();
+        boolean wasRunningAll = disable();
         for ( Future<?> futureResult : getFutureResults() )
         {
             try
@@ -60,42 +62,45 @@ final class SharedThreadPoolStrategy
             catch ( InterruptedException e )
             {
                 // after called external ExecutorService#shutdownNow()
-                // or ExecutorService#shutdown()
                 wasRunningAll = false;
             }
             catch ( ExecutionException e )
             {
-                // test throws exception
+                // JUnit core throws exception.
+                if ( e.getCause() != null )
+                {
+                    logQuietly( e.getCause() );
+                }
             }
             catch ( CancellationException e )
             {
-                // cannot happen because not calling Future#cancel()
+                /**
+                 * Cancelled by {@link Future#cancel(boolean)} in {@link stop()} and {@link stopNow()}.
+                 */
             }
         }
-        disable();
         return wasRunningAll;
     }
 
     @Override
-    protected final boolean stop()
+    protected boolean stop()
     {
         return stop( false );
     }
 
     @Override
-    protected final boolean stopNow()
+    protected boolean stopNow()
     {
         return stop( true );
     }
 
     private boolean stop( boolean interrupt )
     {
-        final boolean wasRunning = canSchedule();
+        final boolean wasRunning = disable();
         for ( Future<?> futureResult : getFutureResults() )
         {
             futureResult.cancel( interrupt );
         }
-        disable();
         return wasRunning;
     }
 }

@@ -19,15 +19,15 @@ package org.apache.maven.plugin.surefire.report;
  * under the License.
  */
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.apache.maven.plugin.surefire.runorder.StatisticsReporter;
 import org.apache.maven.surefire.report.ConsoleLogger;
 import org.apache.maven.surefire.report.ConsoleOutputReceiver;
 import org.apache.maven.surefire.report.ReportEntry;
 import org.apache.maven.surefire.report.RunListener;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Reports data for a single test set.
@@ -63,6 +63,7 @@ public class TestSetRunListener
 
     private final StatisticsReporter statisticsReporter;
 
+    @SuppressWarnings( "checkstyle:parameternumber" )
     public TestSetRunListener( ConsoleReporter consoleReporter, FileReporter fileReporter,
                                StatelessXmlReporter simpleXMLReporter,
                                TestcycleConsoleOutputReceiver consoleOutputReceiver,
@@ -169,7 +170,7 @@ public class TestSetRunListener
 
     public void testSucceeded( ReportEntry reportEntry )
     {
-        WrappedReportEntry wrapped = wrap( reportEntry, ReportEntryType.success );
+        WrappedReportEntry wrapped = wrap( reportEntry, ReportEntryType.SUCCESS );
         detailsForThis.testSucceeded( wrapped );
         if ( statisticsReporter != null )
         {
@@ -180,7 +181,7 @@ public class TestSetRunListener
 
     public void testError( ReportEntry reportEntry )
     {
-        WrappedReportEntry wrapped = wrap( reportEntry, ReportEntryType.error );
+        WrappedReportEntry wrapped = wrap( reportEntry, ReportEntryType.ERROR );
         detailsForThis.testError( wrapped );
         if ( statisticsReporter != null )
         {
@@ -191,7 +192,7 @@ public class TestSetRunListener
 
     public void testFailed( ReportEntry reportEntry )
     {
-        WrappedReportEntry wrapped = wrap( reportEntry, ReportEntryType.failure );
+        WrappedReportEntry wrapped = wrap( reportEntry, ReportEntryType.FAILURE );
         detailsForThis.testFailure( wrapped );
         if ( statisticsReporter != null )
         {
@@ -206,7 +207,8 @@ public class TestSetRunListener
 
     public void testSkipped( ReportEntry reportEntry )
     {
-        WrappedReportEntry wrapped = wrap( reportEntry, ReportEntryType.skipped );
+        WrappedReportEntry wrapped = wrap( reportEntry, ReportEntryType.SKIPPED );
+
         detailsForThis.testSkipped( wrapped );
         if ( statisticsReporter != null )
         {
@@ -223,7 +225,7 @@ public class TestSetRunListener
     private WrappedReportEntry wrap( ReportEntry other, ReportEntryType reportEntryType )
     {
         final int estimatedElapsed;
-        if ( reportEntryType != ReportEntryType.skipped )
+        if ( reportEntryType != ReportEntryType.SKIPPED )
         {
             if ( other.getElapsed() != null )
             {
@@ -259,7 +261,7 @@ public class TestSetRunListener
 
     public void  addTestMethodStats()
     {
-        for (WrappedReportEntry reportEntry : detailsForThis.getReportEntries())
+        for ( WrappedReportEntry reportEntry : detailsForThis.getReportEntries() )
         {
             TestMethodStats methodStats =
                 new TestMethodStats( reportEntry.getClassMethodName(), reportEntry.getReportEntryType(),

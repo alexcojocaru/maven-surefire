@@ -36,7 +36,6 @@ import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -46,6 +45,7 @@ import java.util.StringTokenizer;
 import static org.apache.maven.plugin.surefire.report.DefaultReporterFactory.TestResultType;
 import static org.apache.maven.plugin.surefire.report.FileReporterUtils.stripIllegalFilenameChars;
 
+// CHECKSTYLE_OFF: LineLength
 /**
  * XML format reporter writing to <code>TEST-<i>reportName</i>[-<i>suffix</i>].xml</code> file like written and read
  * by Ant's <a href="http://ant.apache.org/manual/Tasks/junit.html"><code>&lt;junit&gt;</code></a> and
@@ -95,20 +95,20 @@ public class StatelessXmlReporter
 
     // Map between test class name and a map between test method name
     // and the list of runs for each test method
-    private Map<String, Map<String, List<WrappedReportEntry>>> testClassMethodRunHistoryMap =
-        Collections.synchronizedMap( new HashMap<String, Map<String, List<WrappedReportEntry>>>() );
+    private final Map<String, Map<String, List<WrappedReportEntry>>> testClassMethodRunHistoryMap;
 
     public StatelessXmlReporter( File reportsDirectory, String reportNameSuffix, boolean trimStackTrace,
-                                 int rerunFailingTestsCount )
+                                 int rerunFailingTestsCount,
+                                 Map<String, Map<String, List<WrappedReportEntry>>> testClassMethodRunHistoryMap )
     {
         this.reportsDirectory = reportsDirectory;
         this.reportNameSuffix = reportNameSuffix;
         this.trimStackTrace = trimStackTrace;
         this.rerunFailingTestsCount = rerunFailingTestsCount;
+        this.testClassMethodRunHistoryMap = testClassMethodRunHistoryMap;
     }
 
     public void testSetCompleted( WrappedReportEntry testSetReportEntry, TestSetStats testSetStats )
-        throws ReporterException
     {
         String testClassName = testSetReportEntry.getName();
 
@@ -154,7 +154,7 @@ public class StatelessXmlReporter
                         case success:
                             for ( WrappedReportEntry methodEntry : methodEntryList )
                             {
-                                if ( methodEntry.getReportEntryType() == ReportEntryType.success )
+                                if ( methodEntry.getReportEntryType() == ReportEntryType.SUCCESS )
                                 {
                                     startTestElement( ppw, methodEntry, reportNameSuffix,
                                                       methodEntryList.get( 0 ).elapsedTimeAsString() );
@@ -190,7 +190,7 @@ public class StatelessXmlReporter
                             // Get the run time of the first successful run
                             for ( WrappedReportEntry singleRunEntry : methodEntryList )
                             {
-                                if ( singleRunEntry.getReportEntryType() == ReportEntryType.success )
+                                if ( singleRunEntry.getReportEntryType() == ReportEntryType.SUCCESS )
                                 {
                                     runtime = singleRunEntry.elapsedTimeAsString();
                                     break;
@@ -199,7 +199,7 @@ public class StatelessXmlReporter
                             startTestElement( ppw, methodEntryList.get( 0 ), reportNameSuffix, runtime );
                             for ( WrappedReportEntry singleRunEntry : methodEntryList )
                             {
-                                if ( singleRunEntry.getReportEntryType() != ReportEntryType.success )
+                                if ( singleRunEntry.getReportEntryType() != ReportEntryType.SUCCESS )
                                 {
                                     getTestProblems( fw, ppw, singleRunEntry, trimStackTrace, outputStream,
                                                      singleRunEntry.getReportEntryType().getFlakyXmlTag(), true );
@@ -226,7 +226,7 @@ public class StatelessXmlReporter
                     for ( WrappedReportEntry methodEntry : methodEntryList )
                     {
                         startTestElement( ppw, methodEntry, reportNameSuffix, methodEntry.elapsedTimeAsString() );
-                        if ( methodEntry.getReportEntryType() != ReportEntryType.success )
+                        if ( methodEntry.getReportEntryType() != ReportEntryType.SUCCESS )
                         {
                             getTestProblems( fw, ppw, methodEntry, trimStackTrace, outputStream,
                                              methodEntry.getReportEntryType().getXmlTag(), false );
@@ -247,7 +247,8 @@ public class StatelessXmlReporter
     /**
      * Clean testClassMethodRunHistoryMap
      */
-    public void cleanTestHistoryMap() {
+    public void cleanTestHistoryMap()
+    {
         testClassMethodRunHistoryMap.clear();
     }
 
@@ -257,7 +258,7 @@ public class StatelessXmlReporter
      * @param methodEntryList the list of runs for a given test
      * @return the TestResultType for the given test
      */
-    private static TestResultType getTestResultType( List<WrappedReportEntry> methodEntryList )
+    private TestResultType getTestResultType( List<WrappedReportEntry> methodEntryList )
     {
         List<ReportEntryType> testResultTypeList = new ArrayList<ReportEntryType>();
         for ( WrappedReportEntry singleRunEntry : methodEntryList )
@@ -265,7 +266,7 @@ public class StatelessXmlReporter
             testResultTypeList.add( singleRunEntry.getReportEntryType() );
         }
 
-        return DefaultReporterFactory.getTestResultType( testResultTypeList );
+        return DefaultReporterFactory.getTestResultType( testResultTypeList, rerunFailingTestsCount );
     }
 
     /**
@@ -279,7 +280,7 @@ public class StatelessXmlReporter
      *                            in a given test class
      * @return the run time for the entire test class
      */
-    private static int getRunTimeForAllTests( Map<String, List<WrappedReportEntry>> methodRunHistoryMap )
+    private int getRunTimeForAllTests( Map<String, List<WrappedReportEntry>> methodRunHistoryMap )
     {
         int totalTimeForSuite = 0;
         for ( Map.Entry<String, List<WrappedReportEntry>> entry : methodRunHistoryMap.entrySet() )
@@ -308,7 +309,7 @@ public class StatelessXmlReporter
                     // Get the first successful run's time for flaky runs
                     for ( WrappedReportEntry singleRunEntry : methodEntryList )
                     {
-                        if ( singleRunEntry.getReportEntryType() == ReportEntryType.success )
+                        if ( singleRunEntry.getReportEntryType() == ReportEntryType.SUCCESS )
                         {
                             totalTimeForSuite = totalTimeForSuite + singleRunEntry.getElapsed();
                             break;

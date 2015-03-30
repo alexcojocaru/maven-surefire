@@ -19,12 +19,15 @@ package org.apache.maven.surefire.junitcore.pc;
  * under the License.
  */
 
+import org.apache.maven.surefire.report.ConsoleLogger;
 import org.junit.runner.Description;
 import org.junit.runners.model.RunnerScheduler;
 
-import java.util.ArrayList;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 import java.util.Collection;
 import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.RejectedExecutionHandler;
@@ -53,9 +56,13 @@ public class Scheduler
 
     private final Description description;
 
+    private final ConsoleLogger logger;
+
     private volatile boolean shutdown = false;
 
     private volatile boolean started = false;
+
+    private volatile boolean finished = false;
 
     private volatile Controller masterController;
 
@@ -65,44 +72,48 @@ public class Scheduler
      * You can use it with one infinite thread pool shared in strategies across all
      * suites, class runners, etc.
      */
-    public Scheduler( Description description, SchedulingStrategy strategy )
+    public Scheduler( ConsoleLogger logger, Description description, SchedulingStrategy strategy )
     {
-        this( description, strategy, -1 );
+        this( logger, description, strategy, -1 );
     }
 
     /**
      * Should be used if schedulers in parallel children and parent use one instance of bounded thread pool.
      * <p/>
      * Set this scheduler in a e.g. one suite of classes, then every individual class runner should reference
-     * {@link #Scheduler(org.junit.runner.Description, Scheduler, SchedulingStrategy)}
-     * or {@link #Scheduler(org.junit.runner.Description, Scheduler, SchedulingStrategy, int)}.
+     * {@link Scheduler(ConsoleLogger, org.junit.runner.Description, Scheduler, SchedulingStrategy)}
+     * or {@link Scheduler(ConsoleLogger, org.junit.runner.Description, Scheduler, SchedulingStrategy, int)}.
      *
+     * @param logger current logger implementation
      * @param description description of current runner
      * @param strategy    scheduling strategy with a shared thread pool
      * @param concurrency determines maximum concurrent children scheduled a time via {@link #schedule(Runnable)}
      * @throws NullPointerException if null <tt>strategy</tt>
      */
-    public Scheduler( Description description, SchedulingStrategy strategy, int concurrency )
+    public Scheduler( ConsoleLogger logger, Description description, SchedulingStrategy strategy, int concurrency )
     {
-        this( description, strategy, BalancerFactory.createBalancer( concurrency ) );
+        this( logger, description, strategy, BalancerFactory.createBalancer( concurrency ) );
     }
 
     /**
      * New instances should be used by schedulers with limited concurrency by <tt>balancer</tt>
      * against other groups of schedulers. The schedulers share one pool.
      * <p/>
-     * Unlike in {@link #Scheduler(org.junit.runner.Description, SchedulingStrategy, int)} which was limiting
-     * the <tt>concurrency</tt> of children of a runner where this scheduler was set, <em>this</em> <tt>balancer</tt>
-     * is limiting the concurrency of all children in runners having schedulers created by this constructor.
+     * Unlike in {@link Scheduler(ConsoleLogger, org.junit.runner.Description, SchedulingStrategy, int)} which was
+     * limiting the <tt>concurrency</tt> of children of a runner where this scheduler was set, <em>this</em>
+     * <tt>balancer</tt> is limiting the concurrency of all children in runners having schedulers created by this
+     * constructor.
      *
+     * @param logger current logger implementation
      * @param description description of current runner
      * @param strategy    scheduling strategy which may share threads with other strategy
      * @param balancer    determines maximum concurrent children scheduled a time via {@link #schedule(Runnable)}
      * @throws NullPointerException if null <tt>strategy</tt> or <tt>balancer</tt>
      */
-    public Scheduler( Description description, SchedulingStrategy strategy, Balancer balancer )
+    public Scheduler( ConsoleLogger logger, Description description, SchedulingStrategy strategy, Balancer balancer )
     {
         strategy.setDefaultShutdownHandler( newShutdownHandler() );
+        this.logger = logger;
         this.description = description;
         this.strategy = strategy;
         this.balancer = balancer;
@@ -113,29 +124,32 @@ public class Scheduler
      * Can be used by e.g. a runner having parallel classes in use case with parallel
      * suites, classes and methods sharing the same thread pool.
      *
+     * @param logger current logger implementation
      * @param description     description of current runner
      * @param masterScheduler scheduler sharing own threads with this slave
      * @param strategy        scheduling strategy for this scheduler
      * @param balancer        determines maximum concurrent children scheduled a time via {@link #schedule(Runnable)}
      * @throws NullPointerException if null <tt>masterScheduler</tt>, <tt>strategy</tt> or <tt>balancer</tt>
      */
-    public Scheduler( Description description, Scheduler masterScheduler, SchedulingStrategy strategy,
-                      Balancer balancer )
+    public Scheduler( ConsoleLogger logger, Description description, Scheduler masterScheduler,
+                      SchedulingStrategy strategy, Balancer balancer )
     {
-        this( description, strategy, balancer );
+        this( logger, description, strategy, balancer );
         strategy.setDefaultShutdownHandler( newShutdownHandler() );
         masterScheduler.register( this );
     }
 
     /**
-     * @param masterScheduler a reference to {@link #Scheduler(org.junit.runner.Description, SchedulingStrategy, int)}
-     *                        or {@link #Scheduler(org.junit.runner.Description, SchedulingStrategy)}
-     * @see #Scheduler(org.junit.runner.Description, SchedulingStrategy)
-     * @see #Scheduler(org.junit.runner.Description, SchedulingStrategy, int)
+     * @param masterScheduler a reference to
+     * {@link Scheduler(ConsoleLogger, org.junit.runner.Description, SchedulingStrategy, int)}
+     *                        or {@link Scheduler(ConsoleLogger, org.junit.runner.Description, SchedulingStrategy)}
+     * @see Scheduler(ConsoleLogger, org.junit.runner.Description, SchedulingStrategy)
+     * @see Scheduler(ConsoleLogger, org.junit.runner.Description, SchedulingStrategy, int)
      */
-    public Scheduler( Description description, Scheduler masterScheduler, SchedulingStrategy strategy, int concurrency )
+    public Scheduler( ConsoleLogger logger, Description description, Scheduler masterScheduler,
+                      SchedulingStrategy strategy, int concurrency )
     {
-        this( description, strategy, concurrency );
+        this( logger, description, strategy, concurrency );
         strategy.setDefaultShutdownHandler( newShutdownHandler() );
         masterScheduler.register( this );
     }
@@ -146,9 +160,10 @@ public class Scheduler
      * <p/>
      * Cached thread pool is infinite and can be always shared.
      */
-    public Scheduler( Description description, Scheduler masterScheduler, SchedulingStrategy strategy )
+    public Scheduler( ConsoleLogger logger, Description description, Scheduler masterScheduler,
+                      SchedulingStrategy strategy )
     {
-        this( description, masterScheduler, strategy, 0 );
+        this( logger, description, masterScheduler, strategy, 0 );
     }
 
     private void setController( Controller masterController )
@@ -190,63 +205,120 @@ public class Scheduler
 
     protected void logQuietly( Throwable t )
     {
-        t.printStackTrace( System.err );
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        PrintStream stream = new PrintStream( out );
+        t.printStackTrace( stream );
+        stream.close();
+        logger.info( out.toString() );
     }
 
     protected void logQuietly( String msg )
     {
-        System.err.println( msg );
+        logger.info( msg );
     }
 
     /**
      * Attempts to stop all actively executing tasks and immediately returns a collection
      * of descriptions of those tasks which have started prior to this call.
      * <p/>
-     * This scheduler and other registered schedulers will shutdown, see {@link #register(Scheduler)}.
+     * This scheduler and other registered schedulers will stop, see {@link #register(Scheduler)}.
      * If <tt>shutdownNow</tt> is set, waiting methods will be interrupted via {@link Thread#interrupt}.
      *
-     * @param shutdownNow if <tt>true</tt> interrupts waiting methods
+     * @param stopNow if <tt>true</tt> interrupts waiting test methods
      * @return collection of descriptions started before shutting down
      */
-    public Collection<Description> shutdown( boolean shutdownNow )
+    protected ShutdownResult describeStopped( boolean stopNow )
+    {
+        Collection<Description> executedTests = new ConcurrentLinkedQueue<Description>();
+        Collection<Description> incompleteTests = new ConcurrentLinkedQueue<Description>();
+        stop( executedTests, incompleteTests, false, stopNow );
+        return new ShutdownResult( executedTests, incompleteTests );
+    }
+
+    /**
+     * Stop/Shutdown/Interrupt scheduler and its children (if any).
+     *
+     * @param executedTests       Started tests which have finished normally or abruptly till called this method.
+     * @param incompleteTests     Started tests which have finished incomplete due to shutdown.
+     * @param tryCancelFutures    Useful to set to {@code false} if a timeout is specified in plugin config.
+     *                            When the runner of
+     *                            {@link ParallelComputer#getSuite(org.junit.runners.model.RunnerBuilder, Class[])}
+     *                            is finished in
+     *                            {@link org.junit.runners.Suite#run(org.junit.runner.notification.RunNotifier)}
+     *                            all the thread-pools created by {@link ParallelComputerBuilder.PC} are already dead.
+     *                            See the unit test <em>ParallelComputerBuilder#timeoutAndForcedShutdown()</em>.
+     * @param stopNow             Interrupting tests by {@link java.util.concurrent.ExecutorService#shutdownNow()} or
+     *                            {@link java.util.concurrent.Future#cancel(boolean) Future#cancel(true)} or
+     *                            {@link Thread#interrupt()}.
+     */
+    private void stop( Collection<Description> executedTests, Collection<Description> incompleteTests,
+                       boolean tryCancelFutures, boolean stopNow )
     {
         shutdown = true;
-        ArrayList<Description> activeChildren = new ArrayList<Description>();
-
-        if ( started && description != null )
-        {
-            activeChildren.add( description );
-        }
-
-        for ( Controller slave : slaves )
-        {
-            try
-            {
-                activeChildren.addAll( slave.shutdown( shutdownNow ) );
-            }
-            catch ( Throwable t )
-            {
-                logQuietly( t );
-            }
-        }
-
         try
         {
-            balancer.releaseAllPermits();
+            if ( started && !ParallelComputerUtil.isUnusedDescription( description ) )
+            {
+                if ( executedTests != null )
+                {
+                    executedTests.add( description );
+                }
+
+                if ( incompleteTests != null && !finished )
+                {
+                    incompleteTests.add( description );
+                }
+            }
+
+            for ( Controller slave : slaves )
+            {
+                slave.stop( executedTests, incompleteTests, tryCancelFutures, stopNow );
+            }
         }
         finally
         {
-            if ( shutdownNow )
+            try
             {
-                strategy.stopNow();
+                balancer.releaseAllPermits();
             }
-            else
+            finally
             {
-                strategy.stop();
+                if ( stopNow )
+                {
+                    strategy.stopNow();
+                }
+                else if ( tryCancelFutures )
+                {
+                    strategy.stop();
+                }
+                else
+                {
+                    strategy.disable();
+                }
             }
         }
+    }
 
-        return activeChildren;
+    protected boolean shutdownThreadPoolsAwaitingKilled()
+    {
+        if ( masterController == null )
+        {
+            stop( null, null, true, false );
+            boolean isNotInterrupted = true;
+            if ( strategy != null )
+            {
+                isNotInterrupted = strategy.destroy();
+            }
+            for ( Controller slave : slaves )
+            {
+                isNotInterrupted &= slave.destroy();
+            }
+            return isNotInterrupted;
+        }
+        else
+        {
+            throw new UnsupportedOperationException( "cannot call this method if this is not a master scheduler" );
+        }
     }
 
     protected void beforeExecute()
@@ -277,7 +349,7 @@ public class Scheduler
             }
             catch ( RejectedExecutionException e )
             {
-                shutdown( false );
+                stop( null, null, true, false );
             }
             catch ( Throwable t )
             {
@@ -299,10 +371,7 @@ public class Scheduler
         }
         finally
         {
-            for ( Controller slave : slaves )
-            {
-                slave.awaitFinishedQuietly();
-            }
+            finished = true;
         }
     }
 
@@ -357,21 +426,18 @@ public class Scheduler
             return Scheduler.this.canSchedule();
         }
 
-        void awaitFinishedQuietly()
+        void stop( Collection<Description> executedTests, Collection<Description> incompleteTests,
+                   boolean tryCancelFutures, boolean shutdownNow )
         {
-            try
-            {
-                slave.finished();
-            }
-            catch ( Throwable t )
-            {
-                slave.logQuietly( t );
-            }
+            slave.stop( executedTests, incompleteTests, tryCancelFutures, shutdownNow );
         }
 
-        Collection<Description> shutdown( boolean shutdownNow )
+        /**
+         * @see org.apache.maven.surefire.junitcore.pc.Destroyable#destroy()
+         */
+        boolean destroy()
         {
-            return slave.shutdown( shutdownNow );
+            return slave.strategy.destroy();
         }
 
         @Override
@@ -387,6 +453,14 @@ public class Scheduler
         }
     }
 
+    /**
+     * There is a way to shutdown the hierarchy of schedulers. You can do it in master scheduler via
+     * {@link #shutdownThreadPoolsAwaitingKilled()} which kills the current master and children recursively.
+     * If alternatively a shared {@link java.util.concurrent.ExecutorService} used by the master and children
+     * schedulers is shutdown from outside, then the {@link ShutdownHandler} is a hook calling current
+     * {@link #describeStopped(boolean)}. The method {@link #describeStopped(boolean)} is again shutting down children
+     * schedulers recursively as well.
+     */
     public class ShutdownHandler
         implements RejectedExecutionHandler
     {
@@ -406,7 +480,7 @@ public class Scheduler
         {
             if ( executor.isShutdown() )
             {
-                shutdown( false );
+                Scheduler.this.stop( null, null, true, false );
             }
             final RejectedExecutionHandler poolHandler = this.poolHandler;
             if ( poolHandler != null )

@@ -22,6 +22,7 @@ package org.apache.maven.surefire.its.fixture;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.util.Collection;
 import java.util.List;
 
 import org.apache.commons.io.FileUtils;
@@ -87,6 +88,12 @@ public class OutputValidator
         }
     }
 
+    public Collection<String> loadLogLines()
+        throws VerificationException
+    {
+        return verifier.loadFile( verifier.getBasedir(), verifier.getLogFileName(), false );
+    }
+
     public List<String> loadFile( File file, Charset charset )
     {
         //noinspection unchecked
@@ -118,7 +125,6 @@ public class OutputValidator
         return new File( getBasedir(), path );
     }
 
-
     public OutputValidator assertTestSuiteResults( int total, int errors, int failures, int skipped )
     {
         HelperAssertions.assertTestSuiteResults( total, errors, failures, skipped, baseDir );
@@ -131,9 +137,21 @@ public class OutputValidator
         return this;
     }
 
+    public OutputValidator assertTestSuiteResults( int total )
+    {
+        HelperAssertions.assertTestSuiteResults( total, baseDir );
+        return this;
+    }
+
     public OutputValidator assertIntegrationTestSuiteResults( int total, int errors, int failures, int skipped )
     {
         HelperAssertions.assertIntegrationTestSuiteResults( total, errors, failures, skipped, baseDir );
+        return this;
+    }
+
+    public OutputValidator assertIntegrationTestSuiteResults( int total )
+    {
+        HelperAssertions.assertIntegrationTestSuiteResults( total, baseDir );
         return this;
     }
 

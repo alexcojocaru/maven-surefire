@@ -20,7 +20,7 @@ package org.apache.maven.surefire.util;
  */
 
 /**
- * Exception indicating that surefire hard problems with reflection. This may be due
+ * Exception indicating that surefire had problems with reflection. This may be due
  * to programming errors, incorrect configuration or incorrect dependencies, but is
  * generally not recoverable and not relevant to handle.
  *

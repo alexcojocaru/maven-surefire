@@ -56,20 +56,12 @@ public class NonConcurrentRunListener
 
     protected SimpleReportEntry createReportEntry( Description description )
     {
-        return new SimpleReportEntry( description.getClassName(), description.getDisplayName()/*
-                                                                                               * , (int) (
-                                                                                               * System.currentTimeMillis
-                                                                                               * () - startTime )
-                                                                                               */);
+        return new SimpleReportEntry( description.getClassName(), description.getDisplayName() );
     }
 
     protected SimpleReportEntry createReportEntryForTestSet( Description description )
     {
-        return new SimpleReportEntry( description.getClassName(), description.getClassName() /*
-                                                                                              * , (int) (
-                                                                                              * System.currentTimeMillis
-                                                                                              * () - startTime )
-                                                                                              */);
+        return new SimpleReportEntry( description.getClassName(), description.getClassName() );
     }
 
     @Override
@@ -106,7 +98,7 @@ public class NonConcurrentRunListener
             {
                 return description.getChildren().equals( currentTestSetDescription.getChildren() );
             }
-            
+
             return false;
         }
 
@@ -135,6 +127,8 @@ public class NonConcurrentRunListener
     public void testFailure( Failure failure )
         throws Exception
     {
+        finishLastTestSetIfNecessary( failure.getDescription() );
+
         super.testFailure( failure );
         this.lastFinishedDescription = failure.getDescription();
     }

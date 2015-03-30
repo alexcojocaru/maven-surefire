@@ -163,7 +163,7 @@ public class IntegrationTestMojo
      */
     @Parameter( property = "failsafe.parallel.forcedTimeout" )
     private double parallelTestsTimeoutForcedInSeconds;
-    
+
     /**
      * A list of &lt;include> elements specifying the tests (by pattern) that should be included in testing. When not
      * specified and when the <code>test</code> parameter is not specified, the default includes will be <code><br/>
@@ -177,7 +177,12 @@ public class IntegrationTestMojo
      * Each include item may also contain a comma-separated sublist of items, which will be treated as multiple
      * &nbsp;&lt;include> entries.<br/>
      * <p/>
-     * This parameter is ignored if the TestNG <code>suiteXmlFiles</code> parameter is specified.
+     * This parameter is ignored if the TestNG <code>suiteXmlFiles</code> parameter is specified.<br/>
+     * <br/>
+     * <em>Notice that</em> these values are relative to the directory containing generated test classes of the project
+     * being tested. This directory is declared by the parameter <code>testClassesDirectory</code> which defaults
+     * to the POM property <code>${project.build.testOutputDirectory}</code>, typically <em>src/test/java</em>
+     * unless overridden.
      */
     @Parameter
     private List<String> includes;
@@ -194,10 +199,11 @@ public class IntegrationTestMojo
 
     /**
      * By default, Surefire forks your tests using a manifest-only JAR; set this parameter to "false" to force it to
-     * launch your tests with a plain old Java classpath. (See
-     * http://maven.apache.org/plugins/maven-surefire-plugin/examples/class-loading.html for a more detailed explanation
-     * of manifest-only JARs and their benefits.)
-     * <p/>
+     * launch your tests with a plain old Java classpath. (See the
+     * <a href="http://maven.apache.org/plugins/maven-failsafe-plugin/examples/class-loading.html">
+     *     http://maven.apache.org/plugins/maven-failsafe-plugin/examples/class-loading.html</a>
+     * for a more detailed explanation of manifest-only JARs and their benefits.)
+     * <br/>
      * Beware, setting this to "false" may cause your tests to fail on Windows if your classpath is too long.
      *
      * @since 2.4.3
@@ -212,6 +218,7 @@ public class IntegrationTestMojo
     private String encoding;
 
     /**
+     * (JUnit 4+ providers)
      * The number of times each failing test will be rerun. If set larger than 0, rerun failing tests immediately after
      * they fail. If a failing test passes in any of those reruns, it will be marked as pass and reported as a "flake".
      * However, all the failing attempts will be recorded.
@@ -219,7 +226,47 @@ public class IntegrationTestMojo
     @Parameter( property = "failsafe.rerunFailingTestsCount", defaultValue = "0" )
     protected int rerunFailingTestsCount;
 
-    protected int getRerunFailingTestsCount() {
+    /**
+     * (TestNG) List of &lt;suiteXmlFile> elements specifying TestNG suite xml file locations. Note that
+     * <code>suiteXmlFiles</code> is incompatible with several other parameters of this plugin, like
+     * <code>includes/excludes</code>.<br/>
+     * This parameter is ignored if the <code>test</code> parameter is specified (allowing you to run a single test
+     * instead of an entire suite).
+     *
+     * @since 2.2
+     */
+    @Parameter( property = "failsafe.suiteXmlFiles" )
+    private File[] suiteXmlFiles;
+
+    /**
+     * Defines the order the tests will be run in. Supported values are "alphabetical", "reversealphabetical", "random",
+     * "hourly" (alphabetical on even hours, reverse alphabetical on odd hours), "failedfirst", "balanced" and
+     * "filesystem".
+     * <br/>
+     * <br/>
+     * Odd/Even for hourly is determined at the time the of scanning the classpath, meaning it could change during a
+     * multi-module build.
+     * <br/>
+     * <br/>
+     * Failed first will run tests that failed on previous run first, as well as new tests for this run.
+     * <br/>
+     * <br/>
+     * Balanced is only relevant with parallel=classes, and will try to optimize the run-order of the tests reducing the
+     * overall execution time. Initially a statistics file is created and every next test run will reorder classes.
+     * <br/>
+     * <br/>
+     * Note that the statistics are stored in a file named .surefire-XXXXXXXXX beside pom.xml, and should not be checked
+     * into version control. The "XXXXX" is the SHA1 checksum of the entire surefire configuration, so different
+     * configurations will have different statistics files, meaning if you change any config settings you will re-run
+     * once before new statistics data can be established.
+     *
+     * @since 2.7
+     */
+    @Parameter( property = "failsafe.runOrder", defaultValue = "filesystem" )
+    protected String runOrder;
+
+    protected int getRerunFailingTestsCount()
+    {
         return rerunFailingTestsCount;
     }
 
@@ -264,8 +311,9 @@ public class IntegrationTestMojo
     {
         if ( StringUtils.isEmpty( encoding ) )
         {
-            getLog().warn( "File encoding has not been set, using platform encoding " + ReaderFactory.FILE_ENCODING +
-                               ", i.e. build is platform dependent!" );
+            getLog().warn( "File encoding has not been set, using platform encoding " + ReaderFactory.FILE_ENCODING
+                           + ", i.e. build is platform dependent! The file encoding for reports output files "
+                               + "should be provided by the POM property ${project.reporting.outputEncoding}." );
             return ReaderFactory.FILE_ENCODING;
         }
         else
@@ -471,19 +519,23 @@ public class IntegrationTestMojo
         this.forkedProcessTimeoutInSeconds = forkedProcessTimeoutInSeconds;
     }
 
-    public double getParallelTestsTimeoutInSeconds() {
+    public double getParallelTestsTimeoutInSeconds()
+    {
         return parallelTestsTimeoutInSeconds;
     }
 
-    public void setParallelTestsTimeoutInSeconds( double parallelTestsTimeoutInSeconds ) {
+    public void setParallelTestsTimeoutInSeconds( double parallelTestsTimeoutInSeconds )
+    {
         this.parallelTestsTimeoutInSeconds = parallelTestsTimeoutInSeconds;
     }
 
-    public double getParallelTestsTimeoutForcedInSeconds() {
+    public double getParallelTestsTimeoutForcedInSeconds()
+    {
         return parallelTestsTimeoutForcedInSeconds;
     }
 
-    public void setParallelTestsTimeoutForcedInSeconds( double parallelTestsTimeoutForcedInSeconds ) {
+    public void setParallelTestsTimeoutForcedInSeconds( double parallelTestsTimeoutForcedInSeconds )
+    {
         this.parallelTestsTimeoutForcedInSeconds = parallelTestsTimeoutForcedInSeconds;
     }
 
@@ -545,5 +597,27 @@ public class IntegrationTestMojo
     public void setIncludes( List<String> includes )
     {
         this.includes = includes;
+    }
+
+    public File[] getSuiteXmlFiles()
+    {
+        return suiteXmlFiles;
+    }
+
+    @SuppressWarnings( "UnusedDeclaration" )
+    public void setSuiteXmlFiles( File[] suiteXmlFiles )
+    {
+        this.suiteXmlFiles = suiteXmlFiles;
+    }
+
+    public String getRunOrder()
+    {
+        return runOrder;
+    }
+
+    @SuppressWarnings( "UnusedDeclaration" )
+    public void setRunOrder( String runOrder )
+    {
+        this.runOrder = runOrder;
     }
 }

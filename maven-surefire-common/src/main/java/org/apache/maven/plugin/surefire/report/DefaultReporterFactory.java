@@ -29,6 +29,7 @@ import org.apache.maven.surefire.report.StackTraceWriter;
 import org.apache.maven.surefire.suite.RunResult;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -56,19 +57,18 @@ public class DefaultReporterFactory
         Collections.synchronizedList( new ArrayList<TestSetRunListener>() );
 
     // from "<testclass>.<testmethod>" -> statistics about all the runs for flaky tests
-    private Map<String, List<TestMethodStats>> flakyTests = null;
+    private Map<String, List<TestMethodStats>> flakyTests;
 
     // from "<testclass>.<testmethod>" -> statistics about all the runs for failed tests
-    private Map<String, List<TestMethodStats>> failedTests = null;
+    private Map<String, List<TestMethodStats>> failedTests;
 
     // from "<testclass>.<testmethod>" -> statistics about all the runs for error tests
-    private Map<String, List<TestMethodStats>> errorTests = null;
+    private Map<String, List<TestMethodStats>> errorTests;
 
     public DefaultReporterFactory( StartupReportConfiguration reportConfiguration )
     {
         this.reportConfiguration = reportConfiguration;
         this.statisticsReporter = reportConfiguration.instantiateStatisticsReporter();
-        runStarting();
     }
 
     public RunListener createReporter()
@@ -76,7 +76,7 @@ public class DefaultReporterFactory
         return createTestSetRunListener();
     }
 
-    public void mergeFromOtherFactories( List<DefaultReporterFactory> factories )
+    public void mergeFromOtherFactories( Collection<DefaultReporterFactory> factories )
     {
         for ( DefaultReporterFactory factory : factories )
         {
@@ -140,9 +140,13 @@ public class DefaultReporterFactory
             logger.info( "Results :" );
             logger.info( "" );
         }
-        printTestFailures( logger, TestResultType.failure );
-        printTestFailures( logger, TestResultType.error );
-        printTestFailures( logger, TestResultType.flake );
+        boolean printedFailures = printTestFailures( logger, TestResultType.failure );
+        printedFailures |= printTestFailures( logger, TestResultType.error );
+        printedFailures |= printTestFailures( logger, TestResultType.flake );
+        if ( printedFailures )
+        {
+            logger.info( "" );
+        }
         logger.info( globalStats.getSummary() );
         logger.info( "" );
     }
@@ -163,55 +167,55 @@ public class DefaultReporterFactory
      * if it only has errors or failures, then count its result based on its first run
      *
      * @param reportEntryList the list of test run report type for a given test
+     * @param rerunFailingTestsCount configured rerun count for failing tests
      * @return the type of test result
      */
     // Use default visibility for testing
-    static TestResultType getTestResultType( List<ReportEntryType> reportEntryList )
+    static TestResultType getTestResultType( List<ReportEntryType> reportEntryList, int rerunFailingTestsCount  )
     {
-        if ( reportEntryList == null || reportEntryList.size() == 0 )
+        if ( reportEntryList == null || reportEntryList.isEmpty() )
         {
             return TestResultType.unknown;
         }
 
-        boolean seenSuccess = false, seenFailure = false;
+        boolean seenSuccess = false, seenFailure = false, seenError = false;
         for ( ReportEntryType resultType : reportEntryList )
         {
-            if ( resultType == ReportEntryType.success )
+            if ( resultType == ReportEntryType.SUCCESS )
             {
                 seenSuccess = true;
             }
-            else if ( resultType == ReportEntryType.failure
-                || resultType == ReportEntryType.error )
+            else if ( resultType == ReportEntryType.FAILURE )
             {
                 seenFailure = true;
             }
-        }
-
-        if ( seenSuccess && !seenFailure )
-        {
-            return TestResultType.success;
-        }
-
-        if ( seenSuccess && seenFailure )
-        {
-            return TestResultType.flake;
-        }
-
-        if ( !seenSuccess && seenFailure )
-        {
-            if ( reportEntryList.get( 0 ) == ReportEntryType.failure )
+            else if ( resultType == ReportEntryType.ERROR )
             {
-                return TestResultType.failure;
+                seenError = true;
             }
-            else if ( reportEntryList.get( 0 ) == ReportEntryType.error )
+        }
+
+        if ( seenFailure || seenError )
+        {
+            if ( seenSuccess && rerunFailingTestsCount > 0 )
             {
-                return TestResultType.error;
+                return TestResultType.flake;
             }
             else
             {
-                // Reach here if the first one is skipped but later ones have failure, should be impossible
-                return TestResultType.skipped;
+                if ( seenError )
+                {
+                    return TestResultType.error;
+                }
+                else
+                {
+                    return TestResultType.failure;
+                }
             }
+        }
+        else if ( seenSuccess )
+        {
+            return TestResultType.success;
         }
         else
         {
@@ -220,8 +224,8 @@ public class DefaultReporterFactory
     }
 
     /**
-     * Merge all the TestMethodStats in each TestRunListeners and put results into flakyTests, failedTests and errorTests,
-     * indexed by test class and method name. Update globalStatistics based on the result of the merge.
+     * Merge all the TestMethodStats in each TestRunListeners and put results into flakyTests, failedTests and
+     * errorTests, indexed by test class and method name. Update globalStatistics based on the result of the merge.
      */
     void mergeTestHistoryResult()
     {
@@ -262,20 +266,23 @@ public class DefaultReporterFactory
             completedCount++;
 
             List<ReportEntryType> resultTypeList = new ArrayList<ReportEntryType>();
-            for (TestMethodStats methodStats : testMethodStats)
+            for ( TestMethodStats methodStats : testMethodStats )
             {
                 resultTypeList.add( methodStats.getResultType() );
             }
 
-            TestResultType resultType = getTestResultType( resultTypeList );
+            TestResultType resultType = getTestResultType( resultTypeList,
+                                                           reportConfiguration.getRerunFailingTestsCount() );
 
             switch ( resultType )
             {
                 case success:
                     // If there are multiple successful runs of the same test, count all of them
                     int successCount = 0;
-                    for (ReportEntryType type : resultTypeList) {
-                        if (type == ReportEntryType.success) {
+                    for ( ReportEntryType type : resultTypeList )
+                    {
+                        if ( type == ReportEntryType.SUCCESS )
+                        {
                             successCount++;
                         }
                     }
@@ -307,61 +314,62 @@ public class DefaultReporterFactory
      *
      * @param logger the logger used to log information
      * @param type   the type of results to be printed, could be error, failure or flake
+     * @return {@code true} if printed some lines
      */
     // Use default visibility for testing
-    void printTestFailures( DefaultDirectConsoleReporter logger, TestResultType type )
+    boolean printTestFailures( DefaultDirectConsoleReporter logger, TestResultType type )
     {
-        Map<String, List<TestMethodStats>> testStats;
-        if ( type == TestResultType.failure )
+        boolean printed = false;
+        final Map<String, List<TestMethodStats>> testStats;
+        switch ( type )
         {
-            testStats = failedTests;
-        }
-        else if ( type == TestResultType.error )
-        {
-            testStats = errorTests;
-        }
-        else if ( type == TestResultType.flake )
-        {
-            testStats = flakyTests;
-        }
-        else
-        {
-            logger.info( "" );
-            return;
+            case failure:
+                testStats = failedTests;
+                break;
+            case error:
+                testStats = errorTests;
+                break;
+            case flake:
+                testStats = flakyTests;
+                break;
+            default:
+                return printed;
         }
 
-        if ( testStats.size() > 0 )
+        if ( !testStats.isEmpty() )
         {
             logger.info( type.getLogPrefix() );
+            printed = true;
         }
 
         for ( Map.Entry<String, List<TestMethodStats>> entry : testStats.entrySet() )
         {
+            printed = true;
             List<TestMethodStats> testMethodStats = entry.getValue();
             if ( testMethodStats.size() == 1 )
             {
                 // No rerun, follow the original output format
                 logger.info( "  " + testMethodStats.get( 0 ).getStackTraceWriter().smartTrimmedStackTrace() );
-                continue;
             }
-
-            logger.info( entry.getKey() );
-
-            for ( int i = 0; i < testMethodStats.size(); i++ )
+            else
             {
-                StackTraceWriter failureStackTrace = testMethodStats.get( i ).getStackTraceWriter();
-                if ( failureStackTrace == null )
+                logger.info( entry.getKey() );
+                for ( int i = 0; i < testMethodStats.size(); i++ )
                 {
-                    logger.info( "  Run " + ( i + 1 ) + ": PASS" );
+                    StackTraceWriter failureStackTrace = testMethodStats.get( i ).getStackTraceWriter();
+                    if ( failureStackTrace == null )
+                    {
+                        logger.info( "  Run " + ( i + 1 ) + ": PASS" );
+                    }
+                    else
+                    {
+                        logger.info( "  Run " + ( i + 1 ) + ": " + failureStackTrace.smartTrimmedStackTrace() );
+                    }
                 }
-                else
-                {
-                    logger.info( "  Run " + ( i + 1 ) + ": " + failureStackTrace.smartTrimmedStackTrace() );
-                }
+                logger.info( "" );
             }
-            logger.info( "" );
         }
-        logger.info( "" );
+        return printed;
     }
 
     // Describe the result of a given test

@@ -1,4 +1,5 @@
 package org.apache.maven.surefire.junitcore;
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,8 +22,12 @@ package org.apache.maven.surefire.junitcore;
 import org.junit.runners.model.RunnerScheduler;
 
 /**
+ * Since SUREFIRE 2.18 this class is deprecated.
+ * Please use {@link org.apache.maven.surefire.junitcore.pc.ParallelComputerBuilder} instead.
+ *
  * @author <a href="mailto:kristian@zenior.no">Kristian Rosenvold</a>
  */
+@Deprecated
 class SynchronousRunner
     implements RunnerScheduler
 {

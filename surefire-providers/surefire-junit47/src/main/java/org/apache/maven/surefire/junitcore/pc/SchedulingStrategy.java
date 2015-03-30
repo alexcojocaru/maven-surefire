@@ -19,9 +19,11 @@ package org.apache.maven.surefire.junitcore.pc;
  * under the License.
  */
 
-import org.junit.runners.model.RunnerScheduler;
+import org.apache.maven.surefire.report.ConsoleLogger;
 
-import java.util.concurrent.RejectedExecutionException;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Specifies the strategy of scheduling whether sequential, or parallel.
@@ -36,16 +38,26 @@ import java.util.concurrent.RejectedExecutionException;
  * @since 2.16
  */
 public abstract class SchedulingStrategy
+    implements Destroyable
 {
+
+    private final AtomicBoolean canSchedule = new AtomicBoolean( true );
+
+    private final ConsoleLogger logger;
+
+    protected SchedulingStrategy( ConsoleLogger logger )
+    {
+        this.logger = logger;
+    }
 
     /**
      * Schedules tasks if {@link #canSchedule()}.
      *
      * @param task runnable to schedule in a thread pool or invoke
-     * @throws RejectedExecutionException if <tt>task</tt>
+     * @throws java.util.concurrent.RejectedExecutionException if <tt>task</tt>
      *                                    cannot be scheduled for execution
      * @throws NullPointerException       if <tt>task</tt> is <tt>null</tt>
-     * @see RunnerScheduler#schedule(Runnable)
+     * @see org.junit.runners.model.RunnerScheduler#schedule(Runnable)
      * @see java.util.concurrent.Executor#execute(Runnable)
      */
     protected abstract void schedule( Runnable task );
@@ -59,7 +71,7 @@ public abstract class SchedulingStrategy
      *         pool was shutdown externally).
      * @throws InterruptedException if interrupted while waiting
      *                              for scheduled tasks to finish
-     * @see RunnerScheduler#finished()
+     * @see org.junit.runners.model.RunnerScheduler#finished()
      */
     protected abstract boolean finished()
         throws InterruptedException;
@@ -92,6 +104,16 @@ public abstract class SchedulingStrategy
         return stop();
     }
 
+    /**
+     * Persistently disables this strategy. Atomically ignores {@link Balancer} to acquire a new permit.<p/>
+     * The method {@link #canSchedule()} atomically returns {@code false}.
+     * @return {@code true} if {@link #canSchedule()} has return {@code true} on the beginning of this method call.
+     */
+    protected boolean disable()
+    {
+        return canSchedule.getAndSet( false );
+    }
+
     protected void setDefaultShutdownHandler( Scheduler.ShutdownHandler handler )
     {
     }
@@ -103,7 +125,19 @@ public abstract class SchedulingStrategy
     protected abstract boolean hasSharedThreadPool();
 
     /**
-     * @return <tt>true</tt> unless stopped or finished.
+     * @return <tt>true</tt> unless stopped, finished or disabled.
      */
-    protected abstract boolean canSchedule();
+    protected boolean canSchedule()
+    {
+        return canSchedule.get();
+    }
+
+    protected void logQuietly( Throwable t )
+    {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        PrintStream stream = new PrintStream( out );
+        t.printStackTrace( stream );
+        stream.close();
+        logger.info( out.toString() );
+    }
 }

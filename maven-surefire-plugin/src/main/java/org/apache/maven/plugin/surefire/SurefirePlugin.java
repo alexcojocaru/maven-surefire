@@ -64,8 +64,8 @@ public class SurefirePlugin
      * This parameter overrides the <code>includes/excludes</code> parameters, and the TestNG <code>suiteXmlFiles</code>
      * parameter.
      * <p/>
-     * Since 2.7.3, you can execute a limited number of methods in the test by adding #myMethod or #my*ethod. For example,
-     * "-Dtest=MyTest#myMethod".  This is supported for junit 4.x and testNg.
+     * Since 2.7.3, you can execute a limited number of methods in the test by adding #myMethod or #my*ethod. For
+     * example, "-Dtest=MyTest#myMethod". This is supported for junit 4.x and testNg.
      */
     @Parameter( property = "test" )
     private String test;
@@ -145,7 +145,7 @@ public class SurefirePlugin
      */
     @Parameter( property = "surefire.parallel.forcedTimeout" )
     private double parallelTestsTimeoutForcedInSeconds;
-    
+
     /**
      * A list of &lt;include> elements specifying the tests (by pattern) that should be included in testing. When not
      * specified and when the <code>test</code> parameter is not specified, the default includes will be <code><br/>
@@ -159,7 +159,12 @@ public class SurefirePlugin
      * Each include item may also contain a comma-separated sublist of items, which will be treated as multiple
      * &nbsp;&lt;include> entries.<br/>
      * <p/>
-     * This parameter is ignored if the TestNG <code>suiteXmlFiles</code> parameter is specified.
+     * This parameter is ignored if the TestNG <code>suiteXmlFiles</code> parameter is specified.<br/>
+     * <br/>
+     * <em>Notice that</em> these values are relative to the directory containing generated test classes of the project
+     * being tested. This directory is declared by the parameter <code>testClassesDirectory</code> which defaults
+     * to the POM property <code>${project.build.testOutputDirectory}</code>, typically <em>src/test/java</em>
+     * unless overridden.
      */
     @Parameter
     private List<String> includes;
@@ -176,10 +181,11 @@ public class SurefirePlugin
 
     /**
      * By default, Surefire forks your tests using a manifest-only JAR; set this parameter to "false" to force it to
-     * launch your tests with a plain old Java classpath. (See
-     * http://maven.apache.org/plugins/maven-surefire-plugin/examples/class-loading.html for a more detailed explanation
-     * of manifest-only JARs and their benefits.)
-     * <p/>
+     * launch your tests with a plain old Java classpath. (See the
+     * <a href="http://maven.apache.org/plugins/maven-surefire-plugin/examples/class-loading.html">
+     *     http://maven.apache.org/plugins/maven-surefire-plugin/examples/class-loading.html</a>
+     * for a more detailed explanation of manifest-only JARs and their benefits.)
+     * <br/>
      * Beware, setting this to "false" may cause your tests to fail on Windows if your classpath is too long.
      *
      * @since 2.4.3
@@ -188,6 +194,7 @@ public class SurefirePlugin
     private boolean useManifestOnlyJar;
 
     /**
+     * (JUnit 4+ providers)
      * The number of times each failing test will be rerun. If set larger than 0, rerun failing tests immediately after
      * they fail. If a failing test passes in any of those reruns, it will be marked as pass and reported as a "flake".
      * However, all the failing attempts will be recorded.
@@ -195,7 +202,47 @@ public class SurefirePlugin
     @Parameter( property = "surefire.rerunFailingTestsCount", defaultValue = "0" )
     protected int rerunFailingTestsCount;
 
-    protected int getRerunFailingTestsCount() {
+    /**
+     * (TestNG) List of &lt;suiteXmlFile> elements specifying TestNG suite xml file locations. Note that
+     * <code>suiteXmlFiles</code> is incompatible with several other parameters of this plugin, like
+     * <code>includes/excludes</code>.<br/>
+     * This parameter is ignored if the <code>test</code> parameter is specified (allowing you to run a single test
+     * instead of an entire suite).
+     *
+     * @since 2.2
+     */
+    @Parameter( property = "surefire.suiteXmlFiles" )
+    private File[] suiteXmlFiles;
+
+    /**
+     * Defines the order the tests will be run in. Supported values are "alphabetical", "reversealphabetical", "random",
+     * "hourly" (alphabetical on even hours, reverse alphabetical on odd hours), "failedfirst", "balanced" and
+     * "filesystem".
+     * <br/>
+     * <br/>
+     * Odd/Even for hourly is determined at the time the of scanning the classpath, meaning it could change during a
+     * multi-module build.
+     * <br/>
+     * <br/>
+     * Failed first will run tests that failed on previous run first, as well as new tests for this run.
+     * <br/>
+     * <br/>
+     * Balanced is only relevant with parallel=classes, and will try to optimize the run-order of the tests reducing the
+     * overall execution time. Initially a statistics file is created and every next test run will reorder classes.
+     * <br/>
+     * <br/>
+     * Note that the statistics are stored in a file named .surefire-XXXXXXXXX beside pom.xml, and should not be checked
+     * into version control. The "XXXXX" is the SHA1 checksum of the entire surefire configuration, so different
+     * configurations will have different statistics files, meaning if you change any config settings you will re-run
+     * once before new statistics data can be established.
+     *
+     * @since 2.7
+     */
+    @Parameter( property = "surefire.runOrder", defaultValue = "filesystem" )
+    protected String runOrder;
+
+    protected int getRerunFailingTestsCount()
+    {
         return rerunFailingTestsCount;
     }
 
@@ -341,7 +388,7 @@ public class SurefirePlugin
             String singleTest = aTestArray;
             int index = singleTest.indexOf( '#' );
             if ( index >= 0 )
-            {// the way version 2.7.3.  support single test method
+            { // the way version 2.7.3. support single test method
                 singleTest = singleTest.substring( 0, index );
             }
             tests.append( singleTest );
@@ -368,7 +415,7 @@ public class SurefirePlugin
             {
                 String testStrAfterFirstSharp = this.test.substring( index + 1, this.test.length() );
                 if ( !testStrAfterFirstSharp.contains( "+" ) )
-                {//the original way
+                { //the original way
                     return testStrAfterFirstSharp;
                 }
                 else
@@ -464,19 +511,23 @@ public class SurefirePlugin
         this.forkedProcessTimeoutInSeconds = forkedProcessTimeoutInSeconds;
     }
 
-    public double getParallelTestsTimeoutInSeconds() {
+    public double getParallelTestsTimeoutInSeconds()
+    {
         return parallelTestsTimeoutInSeconds;
     }
 
-    public void setParallelTestsTimeoutInSeconds( double parallelTestsTimeoutInSeconds ) {
+    public void setParallelTestsTimeoutInSeconds( double parallelTestsTimeoutInSeconds )
+    {
         this.parallelTestsTimeoutInSeconds = parallelTestsTimeoutInSeconds;
     }
 
-    public double getParallelTestsTimeoutForcedInSeconds() {
+    public double getParallelTestsTimeoutForcedInSeconds()
+    {
         return parallelTestsTimeoutForcedInSeconds;
     }
 
-    public void setParallelTestsTimeoutForcedInSeconds( double parallelTestsTimeoutForcedInSeconds ) {
+    public void setParallelTestsTimeoutForcedInSeconds( double parallelTestsTimeoutForcedInSeconds )
+    {
         this.parallelTestsTimeoutForcedInSeconds = parallelTestsTimeoutForcedInSeconds;
     }
 
@@ -495,5 +546,27 @@ public class SurefirePlugin
     public void setIncludes( List<String> includes )
     {
         this.includes = includes;
+    }
+
+    public File[] getSuiteXmlFiles()
+    {
+        return suiteXmlFiles;
+    }
+
+    @SuppressWarnings( "UnusedDeclaration" )
+    public void setSuiteXmlFiles( File[] suiteXmlFiles )
+    {
+        this.suiteXmlFiles = suiteXmlFiles;
+    }
+
+    public String getRunOrder()
+    {
+        return runOrder;
+    }
+
+    @SuppressWarnings( "UnusedDeclaration" )
+    public void setRunOrder( String runOrder )
+    {
+        this.runOrder = runOrder;
     }
 }

@@ -19,11 +19,15 @@ package org.apache.maven.surefire.junitcore.pc;
  * under the License.
  */
 
+import net.jcip.annotations.NotThreadSafe;
+import org.apache.maven.surefire.junitcore.Logger;
+import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.runner.Description;
 import org.junit.runner.JUnitCore;
 import org.junit.runner.Result;
 import org.junit.runner.RunWith;
@@ -32,17 +36,18 @@ import org.junit.runners.Suite;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.TimeUnit;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 import static org.hamcrest.core.AnyOf.anyOf;
 import static org.hamcrest.core.Is.is;
 import static org.hamcrest.core.IsNot.not;
 import static org.apache.maven.surefire.junitcore.pc.RangeMatcher.between;
+import static org.junit.Assert.*;
 
 /**
  * @author Tibor Digana (tibor17)
@@ -50,6 +55,8 @@ import static org.apache.maven.surefire.junitcore.pc.RangeMatcher.between;
  */
 public class ParallelComputerBuilderTest
 {
+    private static final Object class1Lock = new Object();
+
     private static volatile boolean beforeShutdown;
 
     private static volatile Runnable shutdownTask;
@@ -84,12 +91,17 @@ public class ParallelComputerBuilderTest
         Class1.maxConcurrentMethods = 0;
         Class1.concurrentMethods = 0;
         shutdownTask = null;
+        NotThreadSafeTest1.t = null;
+        NotThreadSafeTest2.t = null;
+        NotThreadSafeTest3.t = null;
+        NormalTest1.t = null;
+        NormalTest2.t = null;
     }
 
     @Test
     public void parallelMethodsReuseOneOrTwoThreads()
     {
-        ParallelComputerBuilder parallelComputerBuilder = new ParallelComputerBuilder();
+        ParallelComputerBuilder parallelComputerBuilder = new ParallelComputerBuilder( new Logger() );
         parallelComputerBuilder.useOnePool( 4 );
 
         // One thread because one suite: TestSuite, however the capacity is 5.
@@ -132,7 +144,7 @@ public class ParallelComputerBuilderTest
     @Test
     public void suiteAndClassInOnePool()
     {
-        ParallelComputerBuilder parallelComputerBuilder = new ParallelComputerBuilder();
+        ParallelComputerBuilder parallelComputerBuilder = new ParallelComputerBuilder( new Logger() );
         parallelComputerBuilder.useOnePool( 5 );
         parallelComputerBuilder.parallelSuites( 5 );
         parallelComputerBuilder.parallelClasses( 5 );
@@ -158,7 +170,7 @@ public class ParallelComputerBuilderTest
     public void onePoolWithUnlimitedParallelMethods()
     {
         // see ParallelComputerBuilder Javadoc
-        ParallelComputerBuilder parallelComputerBuilder = new ParallelComputerBuilder();
+        ParallelComputerBuilder parallelComputerBuilder = new ParallelComputerBuilder( new Logger() );
         parallelComputerBuilder.useOnePool( 8 );
         parallelComputerBuilder.parallelSuites( 2 );
         parallelComputerBuilder.parallelClasses( 4 );
@@ -183,7 +195,7 @@ public class ParallelComputerBuilderTest
     @Test
     public void underflowParallelism()
     {
-        ParallelComputerBuilder parallelComputerBuilder = new ParallelComputerBuilder();
+        ParallelComputerBuilder parallelComputerBuilder = new ParallelComputerBuilder( new Logger() );
         parallelComputerBuilder.useOnePool( 3 );
 
         // One thread because one suite: TestSuite.
@@ -215,7 +227,7 @@ public class ParallelComputerBuilderTest
     @Test
     public void separatePoolsWithSuite()
     {
-        ParallelComputerBuilder parallelComputerBuilder = new ParallelComputerBuilder();
+        ParallelComputerBuilder parallelComputerBuilder = new ParallelComputerBuilder( new Logger() );
         parallelComputerBuilder.parallelSuites( 5 );
         parallelComputerBuilder.parallelClasses( 5 );
         parallelComputerBuilder.parallelMethods( 3 );
@@ -239,7 +251,7 @@ public class ParallelComputerBuilderTest
     @Test
     public void separatePoolsWithSuiteAndClass()
     {
-        ParallelComputerBuilder parallelComputerBuilder = new ParallelComputerBuilder();
+        ParallelComputerBuilder parallelComputerBuilder = new ParallelComputerBuilder( new Logger() );
         parallelComputerBuilder.parallelSuites( 5 );
         parallelComputerBuilder.parallelClasses( 5 );
         parallelComputerBuilder.parallelMethods( 3 );
@@ -266,7 +278,7 @@ public class ParallelComputerBuilderTest
     @Test
     public void separatePoolsWithSuiteAndSequentialClasses()
     {
-        ParallelComputerBuilder parallelComputerBuilder = new ParallelComputerBuilder();
+        ParallelComputerBuilder parallelComputerBuilder = new ParallelComputerBuilder( new Logger() );
         parallelComputerBuilder.parallelSuites( 5 );
         parallelComputerBuilder.parallelClasses( 1 );
         parallelComputerBuilder.parallelMethods( 3 );
@@ -310,7 +322,7 @@ public class ParallelComputerBuilderTest
     public void nothingParallel()
     {
         JUnitCore core = new JUnitCore();
-        ParallelComputerBuilder builder = new ParallelComputerBuilder();
+        ParallelComputerBuilder builder = new ParallelComputerBuilder( new Logger() );
         assertFalse( builder.isOptimized() );
 
         Result result = core.run( builder.buildComputer(), NothingDoingTest1.class, NothingDoingTest2.class );
@@ -363,7 +375,7 @@ public class ParallelComputerBuilderTest
     @Test
     public void keepBeforeAfterOneClass()
     {
-        ParallelComputerBuilder builder = new ParallelComputerBuilder();
+        ParallelComputerBuilder builder = new ParallelComputerBuilder( new Logger() );
         builder.parallelMethods();
         assertFalse( builder.isOptimized() );
         testKeepBeforeAfter( builder, NothingDoingTest1.class );
@@ -372,7 +384,7 @@ public class ParallelComputerBuilderTest
     @Test
     public void keepBeforeAfterTwoClasses()
     {
-        ParallelComputerBuilder builder = new ParallelComputerBuilder();
+        ParallelComputerBuilder builder = new ParallelComputerBuilder( new Logger() );
         builder.useOnePool( 5 ).parallelClasses( 1 ).parallelMethods( 2 );
         assertFalse( builder.isOptimized() );
         testKeepBeforeAfter( builder, NothingDoingTest1.class, NothingDoingTest2.class );
@@ -381,7 +393,7 @@ public class ParallelComputerBuilderTest
     @Test
     public void keepBeforeAfterTwoParallelClasses()
     {
-        ParallelComputerBuilder builder = new ParallelComputerBuilder();
+        ParallelComputerBuilder builder = new ParallelComputerBuilder( new Logger() );
         builder.useOnePool( 8 ).parallelClasses( 2 ).parallelMethods( 2 );
         assertFalse( builder.isOptimized() );
         JUnitCore core = new JUnitCore();
@@ -394,14 +406,157 @@ public class ParallelComputerBuilderTest
         assertThat( methods.subList( 9, 12 ), is( not( Arrays.asList( "deinit", "deinit", "deinit" ) ) ) );
     }
 
+    @Test
+    public void notThreadSafeTest()
+    {
+        ParallelComputerBuilder builder = new ParallelComputerBuilder( new Logger() )
+            .useOnePool( 6 ).optimize( true ).parallelClasses( 3 ).parallelMethods( 3 );
+        ParallelComputerBuilder.PC computer = (ParallelComputerBuilder.PC) builder.buildComputer();
+        Result result = new JUnitCore().run( computer, NotThreadSafeTest1.class, NotThreadSafeTest2.class );
+        assertTrue( result.wasSuccessful() );
+        assertThat( result.getRunCount(), is( 2 ) );
+        assertNotNull( NotThreadSafeTest1.t );
+        assertNotNull( NotThreadSafeTest2.t );
+        assertSame( NotThreadSafeTest1.t, NotThreadSafeTest2.t );
+        assertThat( computer.notParallelRunners.size(), is( 2 ) );
+        assertTrue( computer.suites.isEmpty() );
+        assertTrue( computer.classes.isEmpty() );
+        assertTrue( computer.nestedClasses.isEmpty() );
+        assertTrue( computer.nestedSuites.isEmpty() );
+        assertFalse( computer.splitPool );
+        assertThat( computer.poolCapacity, is( 6 ) );
+    }
+
+    @Test
+    public void mixedThreadSafety()
+    {
+        ParallelComputerBuilder builder = new ParallelComputerBuilder( new Logger() )
+            .useOnePool( 6 ).optimize( true ).parallelClasses( 3 ).parallelMethods( 3 );
+        ParallelComputerBuilder.PC computer = (ParallelComputerBuilder.PC) builder.buildComputer();
+        Result result = new JUnitCore().run( computer, NotThreadSafeTest1.class, NormalTest1.class );
+        assertTrue( result.wasSuccessful() );
+        assertThat( result.getRunCount(), is( 2 ) );
+        assertNotNull( NotThreadSafeTest1.t );
+        assertNotNull( NormalTest1.t );
+        assertThat( NormalTest1.t.getName(), is( not( "maven-surefire-plugin@NotThreadSafe" ) ) );
+        assertNotSame( NotThreadSafeTest1.t, NormalTest1.t );
+        assertThat( computer.notParallelRunners.size(), is( 1 ) );
+        assertTrue( computer.suites.isEmpty() );
+        assertThat( computer.classes.size(), is( 1 ) );
+        assertTrue( computer.nestedClasses.isEmpty() );
+        assertTrue( computer.nestedSuites.isEmpty() );
+        assertFalse( computer.splitPool );
+        assertThat( computer.poolCapacity, is( 6 ) );
+    }
+
+    @Test
+    public void notThreadSafeTestsInSuite()
+    {
+        ParallelComputerBuilder builder = new ParallelComputerBuilder( new Logger() )
+            .useOnePool( 5 ).parallelMethods( 3 );
+        assertFalse( builder.isOptimized() );
+        ParallelComputerBuilder.PC computer = (ParallelComputerBuilder.PC) builder.buildComputer();
+        Result result = new JUnitCore().run( computer, NotThreadSafeTestSuite.class );
+        assertTrue( result.wasSuccessful() );
+        assertNotNull( NormalTest1.t );
+        assertNotNull( NormalTest2.t );
+        assertSame( NormalTest1.t, NormalTest2.t );
+        assertThat( NormalTest1.t.getName(), is( "maven-surefire-plugin@NotThreadSafe" ) );
+        assertThat( NormalTest2.t.getName(), is( "maven-surefire-plugin@NotThreadSafe" ) );
+        assertThat( computer.notParallelRunners.size(), is( 1 ) );
+        assertTrue( computer.suites.isEmpty() );
+        assertTrue( computer.classes.isEmpty() );
+        assertTrue( computer.nestedClasses.isEmpty() );
+        assertTrue( computer.nestedSuites.isEmpty() );
+        assertFalse( computer.splitPool );
+        assertThat( computer.poolCapacity, is( 5 ) );
+    }
+
+    @Test
+    public void mixedThreadSafetyInSuite()
+    {
+        ParallelComputerBuilder builder = new ParallelComputerBuilder( new Logger() )
+            .useOnePool( 10 ).optimize( true ).parallelSuites( 2 ).parallelClasses( 3 ).parallelMethods( 3 );
+        ParallelComputerBuilder.PC computer = (ParallelComputerBuilder.PC) builder.buildComputer();
+        Result result = new JUnitCore().run( computer, MixedSuite.class );
+        assertTrue( result.wasSuccessful() );
+        assertThat( result.getRunCount(), is( 2 ) );
+        assertNotNull( NotThreadSafeTest1.t );
+        assertNotNull( NormalTest1.t );
+        assertThat( NormalTest1.t.getName(), is( not( "maven-surefire-plugin@NotThreadSafe" ) ) );
+        assertNotSame( NotThreadSafeTest1.t, NormalTest1.t );
+        assertTrue( computer.notParallelRunners.isEmpty() );
+        assertThat( computer.suites.size(), is( 1 ) );
+        assertTrue( computer.classes.isEmpty() );
+        assertThat( computer.nestedClasses.size(), is( 1 ) );
+        assertTrue( computer.nestedSuites.isEmpty() );
+        assertFalse( computer.splitPool );
+        assertThat( computer.poolCapacity, is( 10 ) );
+    }
+
+    @Test
+    public void inheritanceWithNotThreadSafe()
+    {
+        ParallelComputerBuilder builder = new ParallelComputerBuilder( new Logger() )
+            .useOnePool( 10 ).optimize( true ).parallelSuites( 2 ).parallelClasses( 3 ).parallelMethods( 3 );
+        ParallelComputerBuilder.PC computer = (ParallelComputerBuilder.PC) builder.buildComputer();
+        Result result = new JUnitCore().run( computer, OverMixedSuite.class );
+        assertTrue( result.wasSuccessful() );
+        assertThat( result.getRunCount(), is( 2 ) );
+        assertNotNull( NotThreadSafeTest3.t );
+        assertNotNull( NormalTest1.t );
+        assertThat( NormalTest1.t.getName(), is( "maven-surefire-plugin@NotThreadSafe" ) );
+        assertSame( NotThreadSafeTest3.t, NormalTest1.t );
+        assertThat( computer.notParallelRunners.size(), is( 1 ) );
+        assertTrue( computer.suites.isEmpty() );
+        assertTrue( computer.classes.isEmpty() );
+        assertTrue( computer.nestedClasses.isEmpty() );
+        assertTrue( computer.nestedSuites.isEmpty() );
+        assertFalse( computer.splitPool );
+        assertThat( computer.poolCapacity, is( 10 ) );
+    }
+
+    @Test
+    public void beforeAfterThreadChanges()
+        throws InterruptedException
+    {
+        Collection<Thread> expectedThreads = jvmThreads();
+        ParallelComputerBuilder parallelComputerBuilder = new ParallelComputerBuilder( new Logger() );
+        parallelComputerBuilder.parallelMethods( 3 );
+        ParallelComputer computer = parallelComputerBuilder.buildComputer();
+        Result result = new JUnitCore().run( computer, TestWithBeforeAfter.class );
+        assertTrue( result.wasSuccessful() );
+        TimeUnit.MILLISECONDS.sleep( 250 );
+        assertThat( jvmThreads(), is( expectedThreads ) );
+    }
+
+    private static Collection<Thread> jvmThreads()
+    {
+        Thread[] t = new Thread[1000];
+        Thread.enumerate( t );
+        ArrayList<Thread> appThreads = new ArrayList<Thread>( t.length );
+        Collections.addAll( appThreads, t );
+        appThreads.removeAll( Collections.singleton( null ) );
+        Collections.sort( appThreads, new Comparator<Thread>()
+        {
+            public int compare( Thread t1, Thread t2 )
+            {
+                return (int) Math.signum( t1.getId() - t2.getId() );
+            }
+        } );
+        return appThreads;
+    }
+
     private static class ShutdownTest
     {
         Result run( final boolean useInterrupt )
         {
-            ParallelComputerBuilder parallelComputerBuilder = new ParallelComputerBuilder().useOnePool( 8 );
-            parallelComputerBuilder.parallelSuites( 2 );
-            parallelComputerBuilder.parallelClasses( 3 );
-            parallelComputerBuilder.parallelMethods( 3 );
+            ParallelComputerBuilder parallelComputerBuilder = new ParallelComputerBuilder( new Logger() )
+                .useOnePool( 8 )
+                .parallelSuites( 2 )
+                .parallelClasses( 3 )
+                .parallelMethods( 3 );
+
             assertFalse( parallelComputerBuilder.isOptimized() );
 
             final ParallelComputerBuilder.PC computer =
@@ -410,7 +565,7 @@ public class ParallelComputerBuilderTest
             {
                 public void run()
                 {
-                    Collection<org.junit.runner.Description> startedTests = computer.shutdown( useInterrupt );
+                    Collection<Description> startedTests = computer.describeStopped( useInterrupt ).getTriggeredTests();
                     assertThat( startedTests.size(), is( not( 0 ) ) );
                 }
             };
@@ -428,10 +583,10 @@ public class ParallelComputerBuilderTest
         public void test1()
             throws InterruptedException
         {
-            synchronized ( Class1.class )
+            synchronized ( class1Lock )
             {
                 ++concurrentMethods;
-                Class1.class.wait( 500 );
+                class1Lock.wait( 500 );
                 maxConcurrentMethods = Math.max( maxConcurrentMethods, concurrentMethods-- );
             }
         }
@@ -511,7 +666,193 @@ public class ParallelComputerBuilderTest
 
     @RunWith( Suite.class )
     @Suite.SuiteClasses( { Class2.class, Class1.class } )
-    public class TestSuite
+    public static class TestSuite
     {
+    }
+
+    @NotThreadSafe
+    public static class NotThreadSafeTest1
+    {
+        static volatile Thread t;
+
+        @BeforeClass
+        public static void beforeSuite()
+        {
+            assertThat( Thread.currentThread().getName(), is( not( "maven-surefire-plugin@NotThreadSafe" ) ) );
+        }
+
+        @AfterClass
+        public static void afterSuite()
+        {
+            assertThat( Thread.currentThread().getName(), is( not( "maven-surefire-plugin@NotThreadSafe" ) ) );
+        }
+
+        @Test
+        public void test()
+        {
+            t = Thread.currentThread();
+            assertThat( t.getName(), is( "maven-surefire-plugin@NotThreadSafe" ) );
+        }
+    }
+
+    @NotThreadSafe
+    public static class NotThreadSafeTest2
+    {
+        static volatile Thread t;
+
+        @BeforeClass
+        public static void beforeSuite()
+        {
+            assertThat( Thread.currentThread().getName(), is( not( "maven-surefire-plugin@NotThreadSafe" ) ) );
+        }
+
+        @AfterClass
+        public static void afterSuite()
+        {
+            assertThat( Thread.currentThread().getName(), is( not( "maven-surefire-plugin@NotThreadSafe" ) ) );
+        }
+
+        @Test
+        public void test()
+        {
+            t = Thread.currentThread();
+            assertThat( t.getName(), is( "maven-surefire-plugin@NotThreadSafe" ) );
+        }
+    }
+
+    @NotThreadSafe
+    public static class NotThreadSafeTest3
+    {
+        static volatile Thread t;
+
+        @Test
+        public void test()
+        {
+            t = Thread.currentThread();
+            assertThat( t.getName(), is( "maven-surefire-plugin@NotThreadSafe" ) );
+        }
+    }
+
+    @RunWith( Suite.class )
+    @Suite.SuiteClasses( { NormalTest1.class, NormalTest2.class } )
+    @NotThreadSafe
+    public static class NotThreadSafeTestSuite
+    {
+        @BeforeClass
+        public static void beforeSuite()
+        {
+            assertThat( Thread.currentThread().getName(), is( not( "maven-surefire-plugin@NotThreadSafe" ) ) );
+        }
+
+        @AfterClass
+        public static void afterSuite()
+        {
+            assertThat( Thread.currentThread().getName(), is( not( "maven-surefire-plugin@NotThreadSafe" ) ) );
+        }
+    }
+
+    public static class NormalTest1
+    {
+        static volatile Thread t;
+
+        @Test
+        public void test()
+        {
+            t = Thread.currentThread();
+        }
+    }
+
+    public static class NormalTest2
+    {
+        static volatile Thread t;
+
+        @Test
+        public void test()
+        {
+            t = Thread.currentThread();
+        }
+    }
+
+    @RunWith( Suite.class )
+    @Suite.SuiteClasses( { NotThreadSafeTest1.class, NormalTest1.class } )
+    public static class MixedSuite
+    {
+        @BeforeClass
+        public static void beforeSuite()
+        {
+            assertThat( Thread.currentThread().getName(), is( not( "maven-surefire-plugin@NotThreadSafe" ) ) );
+        }
+
+        @AfterClass
+        public static void afterSuite()
+        {
+            assertThat( Thread.currentThread().getName(), is( not( "maven-surefire-plugin@NotThreadSafe" ) ) );
+        }
+    }
+
+    @RunWith( Suite.class )
+    @Suite.SuiteClasses( { NotThreadSafeTest3.class, NormalTest1.class } )
+    @NotThreadSafe
+    public static class OverMixedSuite
+    {
+        @BeforeClass
+        public static void beforeSuite()
+        {
+            assertThat( Thread.currentThread().getName(), is( not( "maven-surefire-plugin@NotThreadSafe" ) ) );
+        }
+
+        @AfterClass
+        public static void afterSuite()
+        {
+            assertThat( Thread.currentThread().getName(), is( not( "maven-surefire-plugin@NotThreadSafe" ) ) );
+        }
+    }
+
+    public static class TestWithBeforeAfter
+    {
+        @BeforeClass
+        public static void beforeClass()
+            throws InterruptedException
+        {
+            System.out.println( new Date() + " BEG: beforeClass" );
+            TimeUnit.SECONDS.sleep( 1 );
+            System.out.println( new Date() + " END: beforeClass" );
+        }
+
+        @Before
+        public void before()
+            throws InterruptedException
+        {
+            System.out.println( new Date() + " BEG: before" );
+            TimeUnit.SECONDS.sleep( 1 );
+            System.out.println( new Date() + " END: before" );
+        }
+
+        @Test
+        public void test()
+            throws InterruptedException
+        {
+            System.out.println( new Date() + " BEG: test" );
+            TimeUnit.SECONDS.sleep( 1 );
+            System.out.println( new Date() + " END: test" );
+        }
+
+        @After
+        public void after()
+            throws InterruptedException
+        {
+            System.out.println( new Date() + " BEG: after" );
+            TimeUnit.SECONDS.sleep( 1 );
+            System.out.println( new Date() + " END: after" );
+        }
+
+        @AfterClass
+        public static void afterClass()
+            throws InterruptedException
+        {
+            System.out.println( new Date() + " BEG: afterClass" );
+            TimeUnit.SECONDS.sleep( 1 );
+            System.out.println( new Date() + " END: afterClass" );
+        }
     }
 }

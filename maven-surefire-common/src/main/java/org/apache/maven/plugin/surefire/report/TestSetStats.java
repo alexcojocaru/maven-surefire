@@ -1,4 +1,5 @@
 package org.apache.maven.plugin.surefire.report;
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,14 +21,19 @@ package org.apache.maven.plugin.surefire.report;
 
 import java.text.NumberFormat;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  * Maintains per-thread test result state. Not thread safe.
  */
 public class TestSetStats
 {
+    private final Queue<WrappedReportEntry> reportEntries = new ConcurrentLinkedQueue<WrappedReportEntry>();
+
     private final boolean trimStackTrace;
 
     private final boolean plainFormat;
@@ -48,8 +54,6 @@ public class TestSetStats
 
     private long elapsedForTestSet;
 
-    private final List<WrappedReportEntry> reportEntries = new ArrayList<WrappedReportEntry>();
-
     public TestSetStats( boolean trimStackTrace, boolean plainFormat )
     {
         this.trimStackTrace = trimStackTrace;
@@ -58,22 +62,38 @@ public class TestSetStats
 
     public int getElapsedSinceTestSetStart()
     {
-        return (int) ( System.currentTimeMillis() - testSetStartAt );
+        if ( testSetStartAt > 0 )
+        {
+            return (int) ( System.currentTimeMillis() - testSetStartAt );
+        }
+        else
+        {
+            return 0;
+        }
     }
 
     public int getElapsedSinceLastStart()
     {
-        return (int) ( System.currentTimeMillis() - lastStartAt );
+        if ( lastStartAt > 0 )
+        {
+            return (int) ( System.currentTimeMillis() - lastStartAt );
+        }
+        else
+        {
+            return 0;
+        }
     }
 
     public void testSetStart()
     {
-        lastStartAt = testSetStartAt = System.currentTimeMillis();
+        testSetStartAt = System.currentTimeMillis();
+        lastStartAt = testSetStartAt;
     }
 
     public void testStart()
     {
-        lastStartAt = testStartAt = System.currentTimeMillis();
+        testStartAt = System.currentTimeMillis();
+        lastStartAt = testStartAt;
     }
 
     private long finishTest( WrappedReportEntry reportEntry )
@@ -225,7 +245,7 @@ public class TestSetStats
         return result;
     }
 
-    public List<WrappedReportEntry> getReportEntries()
+    public Collection<WrappedReportEntry> getReportEntries()
     {
         return reportEntries;
     }

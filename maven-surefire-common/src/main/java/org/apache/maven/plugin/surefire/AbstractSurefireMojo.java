@@ -1,3 +1,4 @@
+// CHECKSTYLE_OFF: FileLength|RegexpHeader
 package org.apache.maven.plugin.surefire;
 
 /*
@@ -26,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -207,8 +209,8 @@ public abstract class AbstractSurefireMojo
     protected File testSourceDirectory;
 
     /**
-     * A file containing include patterns.
-     * Blank lines, or lines starting with # are ignored.  If {@code includes} are also specified these patterns are appended.
+     * A file containing include patterns. Blank lines, or lines starting with # are ignored. If {@code includes} are
+     * also specified these patterns are appended.
      */
     @Parameter
     protected File includesFile;
@@ -224,13 +226,18 @@ public abstract class AbstractSurefireMojo
      * <p/>
      * Each exclude item may also contain a comma-separated sublist of items, which will be treated as multiple
      * &nbsp;&lt;exclude> entries.<br/>
+     * <br/>
+     * <em>Notice that</em> these values are relative to the directory containing generated test classes of the project
+     * being tested. This directory is declared by the parameter <code>testClassesDirectory</code> which defaults
+     * to the POM property <code>${project.build.testOutputDirectory}</code>, typically <em>src/test/java</em>
+     * unless overridden.
      */
     @Parameter
     protected List<String> excludes;
 
     /**
-     * A file containing exclude patterns.
-     * Blank lines, or lines starting with # are ignored.  If {@code excludes} are also specified these patterns are appended.
+     * A file containing exclude patterns. Blank lines, or lines starting with # are ignored. If {@code excludes} are
+     * also specified these patterns are appended.
      */
     @Parameter
     protected File excludesFile;
@@ -316,11 +323,13 @@ public abstract class AbstractSurefireMojo
     protected Boolean failIfNoTests;
 
     /**
-     * <strong>DEPRECATED</strong> since version 2.14. Use <code>forkCount</code> and <code>reuseForks</code> instead.<br/>
+     * <strong>DEPRECATED</strong> since version 2.14. Use <code>forkCount</code> and <code>reuseForks</code> instead.
      * <br/>
-     * Option to specify the forking mode. Can be "never", "once", "always", "perthread". "none" and "pertest" are also accepted
-     * for backwards compatibility. "always" forks for each test-class. "perthread" will create <code>threadCount</code>
-     * parallel forks, each executing one test-class. See also parameter <code>reuseForks</code>.<br/>
+     * <br/>
+     * Option to specify the forking mode. Can be "never", "once", "always", "perthread". "none" and "pertest" are also
+     * accepted for backwards compatibility. "always" forks for each test-class. "perthread" will create
+     * <code>threadCount</code> parallel forks, each executing one test-class. See also parameter
+     * <code>reuseForks</code>.<br/>
      *
      * @since 2.1
      */
@@ -339,6 +348,16 @@ public abstract class AbstractSurefireMojo
 
     /**
      * Arbitrary JVM options to set on the command line.
+     * <br/>
+     * <br/>
+     * Using an alternate syntax for <em>argLine</em>, <pre>@{...}</pre> allows late replacement of properties when the
+     * plugin is executed, so properties that have been modified by other plugins will be picked up correctly.
+     * See the Frequently Asked Questions page with more details:<br/>
+     * <a href="http://maven.apache.org/surefire/maven-surefire-plugin/faq.html">
+     *     http://maven.apache.org/surefire/maven-surefire-plugin/faq.html</a>
+     * <br/>
+     * <a href="http://maven.apache.org/surefire/maven-failsafe-plugin/faq.html">
+     *     http://maven.apache.org/surefire/maven-failsafe-plugin/faq.html</a>
      *
      * @since 2.1
      */
@@ -373,9 +392,13 @@ public abstract class AbstractSurefireMojo
     protected boolean childDelegation;
 
     /**
-     * (TestNG/JUnit47 provider with JUnit4.8+ only) Groups for this test. Only classes/methods/etc decorated with one of the groups specified here will
-     * be included in test run, if specified.<br/>For JUnit, this parameter forces the use of the 4.7 provider<br/>
-     * This parameter is ignored if the <code>suiteXmlFiles</code> parameter is specified.
+     * (TestNG/JUnit47 provider with JUnit4.8+ only) Groups for this test. Only classes/methods/etc decorated with one
+     * of the groups specified here will be included in test run, if specified.<br/>
+     * For JUnit, this parameter forces the use of the 4.7 provider<br/>
+     * This parameter is ignored if the <code>suiteXmlFiles</code> parameter is specified.<br/>
+     * Since version 2.18.1 and JUnit 4.12, the <em>@Category<em> annotation type is automatically inherited from
+     * superclasses, see <em>@java.lang.annotation.Inherited</em>. Make sure that test class inheritance still makes
+     * sense together with <em>@Category<em> annotation of the JUnit 4.12 or higher appeared in superclass.
      *
      * @since 2.2
      */
@@ -383,26 +406,18 @@ public abstract class AbstractSurefireMojo
     protected String groups;
 
     /**
-     * (TestNG/JUnit47 provider with JUnit4.8+ only) Excluded groups. Any methods/classes/etc with one of the groups specified in this list will
-     * specifically not be run.<br/>For JUnit, this parameter forces the use of the 4.7 provider<br/>
-     * This parameter is ignored if the <code>suiteXmlFiles</code> parameter is specified.
+     * (TestNG/JUnit47 provider with JUnit4.8+ only) Excluded groups. Any methods/classes/etc with one of the groups
+     * specified in this list will specifically not be run.<br/>
+     * For JUnit, this parameter forces the use of the 4.7 provider<br/>
+     * This parameter is ignored if the <code>suiteXmlFiles</code> parameter is specified.<br/>
+     * Since version 2.18.1 and JUnit 4.12, the <em>@Category<em> annotation type is automatically inherited from
+     * superclasses, see <em>@java.lang.annotation.Inherited</em>. Make sure that test class inheritance still makes
+     * sense together with <em>@Category<em> annotation of the JUnit 4.12 or higher appeared in superclass.
      *
      * @since 2.2
      */
     @Parameter( property = "excludedGroups" )
     protected String excludedGroups;
-
-    /**
-     * (TestNG) List of &lt;suiteXmlFile> elements specifying TestNG suite xml file locations. Note that
-     * <code>suiteXmlFiles</code> is incompatible with several other parameters of this plugin, like
-     * <code>includes/excludes</code>.<br/>
-     * This parameter is ignored if the <code>test</code> parameter is specified (allowing you to run a single test
-     * instead of an entire suite).
-     *
-     * @since 2.2
-     */
-    @Parameter
-    protected File[] suiteXmlFiles;
 
     /**
      * Allows you to specify the name of the JUnit artifact. If not set, <code>junit:junit</code> will be used.
@@ -425,7 +440,7 @@ public abstract class AbstractSurefireMojo
      * 
      * @since 2.8
      */
-    @Parameter( property = "useDefaultListeners", defaultValue = "true")
+    @Parameter( property = "useDefaultListeners", defaultValue = "true" )
     protected boolean useDefaultListeners;
 
     /**
@@ -438,15 +453,16 @@ public abstract class AbstractSurefireMojo
     protected int threadCount;
 
     /**
-     * Option to specify the number of VMs to fork in parallel in order to execute the tests.
-     * When terminated with "C", the number part is multiplied with the number of CPU cores. Floating point value are only accepted together with "C".
-     * If set to "0", no VM is forked and all tests are executed within the main process.<br/>
+     * Option to specify the number of VMs to fork in parallel in order to execute the tests. When terminated with "C",
+     * the number part is multiplied with the number of CPU cores. Floating point value are only accepted together with
+     * "C". If set to "0", no VM is forked and all tests are executed within the main process.<br/>
      * <br/>
      * Example values: "1.5C", "4"<br/>
      * <br/>
-     * The system properties and the <code>argLine</code> of the forked processes may contain the place holder string <code>${surefire.forkNumber}</code>,
-     * which is replaced with a fixed number for each of the parallel forks, ranging from <code>1</code> to the effective value of <code>forkCount</code>
-     * times the maximum number of parallel Surefire executions in maven parallel builds, i.e. the effective value of the <code>-T</code> command line
+     * The system properties and the <code>argLine</code> of the forked processes may contain the place holder string
+     * <code>${surefire.forkNumber}</code>, which is replaced with a fixed number for each of the parallel forks,
+     * ranging from <code>1</code> to the effective value of <code>forkCount</code> times the maximum number of parallel
+     * Surefire executions in maven parallel builds, i.e. the effective value of the <code>-T</code> command line
      * argument of maven core.
      *
      * @since 2.14
@@ -484,9 +500,9 @@ public abstract class AbstractSurefireMojo
     protected boolean useUnlimitedThreads;
 
     /**
-     * (TestNG only) When you use the <code>parallel</code> attribute, TestNG will try to run all your test methods in
-     * separate threads, except for methods that depend on each other, which will be run in the same thread in order to
-     * respect their order of execution.
+     * (TestNG provider) When you use the <code>parallel</code> attribute, TestNG will try to run all your test methods
+     * in separate threads, except for methods that depend on each other, which will be run in the same thread in order
+     * to respect their order of execution.
      * <p/>
      * (JUnit 4.7 provider) Supports values "classes"/"methods"/"both" to run in separate threads, as controlled by
      * <code>threadCount</code>.<br/>
@@ -558,20 +574,19 @@ public abstract class AbstractSurefireMojo
     /**
      * (JUnit 4.7 provider) This attribute allows you to specify the concurrency in test methods, i.e.:
      * <ul>
-     *  <li>number of concurrent methods if <code>threadCount</code> is 0 or unspecified</li>
-     *  <li>limited concurrency of methods if <code>useUnlimitedThreads</code> is set to <strong>true</strong></li>
-     *  <li>if <code>threadCount</code> and certain thread-count parameters are &gt; 0 for <code>parallel</code>, the
-     *  concurrency is computed from ratio. For instance parallel=all and the ratio between
-     *      <code>threadCountSuites</code>:<code>threadCountClasses</code>:<em>threadCountMethods</em> is
-     *      2:3:<em>5</em>, there is 50% of <code>threadCount</code> in concurrent methods.</li>
-     *  <li>as in the previous case but without this leaf thread-count. Example: parallel=all, threadCount=16,
-     *  threadCountSuites=2, threadCountClasses=3, but threadCountMethods is unspecified leaf, the number of concurrent
-     *  methods is varying from &gt;= 11 to 14 or 15. The threadCountSuites and threadCountClasses become number of threads.
-     *  </li>
+     * <li>number of concurrent methods if <code>threadCount</code> is 0 or unspecified</li>
+     * <li>limited concurrency of methods if <code>useUnlimitedThreads</code> is set to <strong>true</strong></li>
+     * <li>if <code>threadCount</code> and certain thread-count parameters are &gt; 0 for <code>parallel</code>, the
+     * concurrency is computed from ratio. For instance parallel=all and the ratio between
+     * <code>threadCountSuites</code>:<code>threadCountClasses</code>:<em>threadCountMethods</em> is 2:3:<em>5</em>,
+     * there is 50% of <code>threadCount</code> in concurrent methods.</li>
+     * <li>as in the previous case but without this leaf thread-count. Example: parallel=all, threadCount=16,
+     * threadCountSuites=2, threadCountClasses=3, but threadCountMethods is unspecified leaf, the number of concurrent
+     * methods is varying from &gt;= 11 to 14 or 15. The threadCountSuites and threadCountClasses become number of
+     * threads.</li>
      * </ul>
-     *
-     * Only makes sense to use in conjunction with the <code>parallel</code> parameter.
-     * The default value <code>0</code> behaves same as unspecified one.
+     * Only makes sense to use in conjunction with the <code>parallel</code> parameter. The default value <code>0</code>
+     * behaves same as unspecified one.
      *
      * @since 2.16
      */
@@ -648,29 +663,6 @@ public abstract class AbstractSurefireMojo
      */
     @Parameter( defaultValue = "${session.parallel}", readonly = true )
     protected Boolean parallelMavenExecution;
-
-    /**
-     * Defines the order the tests will be run in. Supported values are "alphabetical", "reversealphabetical", "random",
-     * "hourly" (alphabetical on even hours, reverse alphabetical on odd hours), "failedfirst", "balanced" and "filesystem".
-     * <p/>
-     * <p/>
-     * Odd/Even for hourly is determined at the time the of scanning the classpath, meaning it could change during a
-     * multi-module build.
-     * <p/>
-     * Failed first will run tests that failed on previous run first, as well as new tests for this run.
-     * <p/>
-     * Balanced is only relevant with parallel=classes, and will try to optimize the run-order of the tests to
-     * make all tests complete at the same time, reducing the overall execution time.
-     * <p/>
-     * Note that the statistics are stored in a file named .surefire-XXXXXXXXX beside pom.xml, and should not
-     * be checked into version control. The "XXXXX" is the SHA1 checksum of the entire surefire configuration,
-     * so different configurations will have different statistics files, meaning if you change any config
-     * settings you will re-run once before new statistics data can be established.
-     *
-     * @since 2.7
-     */
-    @Parameter( defaultValue = "filesystem" )
-    protected String runOrder;
 
     /**
      * List of dependencies to scan for test classes to include in the test run.
@@ -794,7 +786,7 @@ public abstract class AbstractSurefireMojo
         String jvmToUse = getJvm();
         if ( toolchain != null )
         {
-            getLog().info( "Toolchain in " + getPluginName() + "-plugin: " + toolchain );
+            getLog().info( "Toolchain in maven-" + getPluginName() + "-plugin: " + toolchain );
             if ( jvmToUse != null )
             {
                 getLog().warn( "Toolchains are ignored, 'executable' parameter is set to " + jvmToUse );
@@ -894,7 +886,8 @@ public abstract class AbstractSurefireMojo
     private SurefireProperties setupProperties()
     {
         SurefireProperties sysProps = null;
-        try {
+        try
+        {
             sysProps = SurefireProperties.loadProperties( systemPropertiesFile );
         }
         catch ( IOException e )
@@ -917,17 +910,47 @@ public abstract class AbstractSurefireMojo
         result.setProperty( "basedir", getBasedir().getAbsolutePath() );
         result.setProperty( "user.dir", getWorkingDirectory().getAbsolutePath() );
         result.setProperty( "localRepository", getLocalRepository().getBasedir() );
-
-        for ( Object o : result.propertiesThatCannotBeSetASystemProperties() )
+        if ( isForking() )
         {
-            getLog().warn( o + " cannot be set as system property, use <argLine>-D" + o + "=...<argLine> instead" );
-
+            for ( Object o : result.propertiesThatCannotBeSetASystemProperties() )
+            {
+                if ( getArgLine() == null || !getArgLine().contains( "-D" + o + "=" ) )
+                {
+                    getLog().warn( o + " cannot be set as system property, use <argLine>-D"
+                                       + o + "=...<argLine> instead" );
+                }
+            }
+            for ( Object systemPropertyMatchingArgLine : systemPropertiesMatchingArgLine( result ) )
+            {
+                getLog().warn( "The system property " + systemPropertyMatchingArgLine + " is configured twice! "
+                                   + "The property appears in <argLine/> and any of <systemPropertyVariables/>, "
+                                   + "<systemProperties/> or user property." );
+            }
         }
         if ( getLog().isDebugEnabled() )
         {
             showToLog( result, getLog(), "system property" );
         }
         return result;
+    }
+
+    private Set<Object> systemPropertiesMatchingArgLine( SurefireProperties result )
+    {
+        Set<Object> intersection = new HashSet<Object>();
+        if ( StringUtils.isNotBlank( getArgLine() ) )
+        {
+            for ( Object systemProperty : result.getStringKeySet() )
+            {
+                if ( getArgLine().contains( "-D" + systemProperty + "=" ) )
+                {
+                    intersection.add( systemProperty );
+                }
+            }
+
+            Set<Object> ignored = result.propertiesThatCannotBeSetASystemProperties();
+            intersection.removeAll( ignored );
+        }
+        return intersection;
     }
 
     public void showToLog( SurefireProperties props, org.apache.maven.plugin.logging.Log log, String setting )
@@ -946,18 +969,17 @@ public abstract class AbstractSurefireMojo
     {
         SurefireProperties effectiveProperties = setupProperties();
         ClassLoaderConfiguration classLoaderConfiguration = getClassLoaderConfiguration( isForking() );
-
+        provider.addProviderProperties();
         RunOrderParameters runOrderParameters =
             new RunOrderParameters( getRunOrder(), getStatisticsFileName( getConfigChecksum() ) );
 
-        final RunResult result;
         if ( isNotForking() )
         {
             createCopyAndReplaceForkNumPlaceholder( effectiveProperties, 1 ).copyToSystemProperties();
 
             InPluginVMSurefireStarter surefireStarter =
                 createInprocessStarter( provider, classLoaderConfiguration, runOrderParameters );
-            result = surefireStarter.runSuitesInProcess( scanResult );
+            return surefireStarter.runSuitesInProcess( scanResult );
         }
         else
         {
@@ -973,7 +995,7 @@ public abstract class AbstractSurefireMojo
                 ForkStarter forkStarter =
                     createForkStarter( provider, forkConfiguration, classLoaderConfiguration, runOrderParameters,
                                        getLog() );
-                result = forkStarter.run( effectiveProperties, scanResult );
+                return forkStarter.run( effectiveProperties, scanResult );
             }
             finally
             {
@@ -981,7 +1003,6 @@ public abstract class AbstractSurefireMojo
                 cleanupForkConfiguration( forkConfiguration );
             }
         }
-        return result;
     }
 
 
@@ -1069,8 +1090,8 @@ public abstract class AbstractSurefireMojo
         }
 
         Artifact testNgArtifact = getTestNgArtifact();
-        if ( testNgArtifact != null){
-
+        if ( testNgArtifact != null )
+        {
             DefaultArtifactVersion defaultArtifactVersion = new DefaultArtifactVersion( testNgArtifact.getVersion() );
             getProperties().setProperty( "testng.configurator", getConfiguratorName( defaultArtifactVersion ) );
         }
@@ -1147,7 +1168,7 @@ public abstract class AbstractSurefireMojo
 
         String usedParallel = ( getParallel() != null ) ? getParallel() : "none";
 
-        if ( !"none".equals( usedParallel ))
+        if ( !"none".equals( usedParallel ) )
         {
             checkNonForkedThreads( parallel );
         }
@@ -1157,9 +1178,12 @@ public abstract class AbstractSurefireMojo
         getProperties().setProperty( ProviderParameterNames.THREADCOUNT_PROP, usedThreadCount );
         getProperties().setProperty( "perCoreThreadCount", Boolean.toString( getPerCoreThreadCount() ) );
         getProperties().setProperty( "useUnlimitedThreads", Boolean.toString( getUseUnlimitedThreads() ) );
-        getProperties().setProperty( ProviderParameterNames.THREADCOUNTSUITES_PROP, Integer.toString( getThreadCountSuites() ) );
-        getProperties().setProperty( ProviderParameterNames.THREADCOUNTCLASSES_PROP, Integer.toString( getThreadCountClasses() ) );
-        getProperties().setProperty( ProviderParameterNames.THREADCOUNTMETHODS_PROP, Integer.toString( getThreadCountMethods() ) );
+        getProperties().setProperty( ProviderParameterNames.THREADCOUNTSUITES_PROP,
+                                     Integer.toString( getThreadCountSuites() ) );
+        getProperties().setProperty( ProviderParameterNames.THREADCOUNTCLASSES_PROP,
+                                     Integer.toString( getThreadCountClasses() ) );
+        getProperties().setProperty( ProviderParameterNames.THREADCOUNTMETHODS_PROP,
+                                     Integer.toString( getThreadCountMethods() ) );
         getProperties().setProperty( ProviderParameterNames.PARALLEL_TIMEOUT_PROP,
                 Double.toString( getParallelTestsTimeoutInSeconds() ) );
         getProperties().setProperty( ProviderParameterNames.PARALLEL_TIMEOUTFORCED_PROP,
@@ -1169,9 +1193,11 @@ public abstract class AbstractSurefireMojo
 
         String message =
             "parallel='" + usedParallel + '\'' + ", perCoreThreadCount=" + getPerCoreThreadCount() + ", threadCount="
-                + usedThreadCount + ", useUnlimitedThreads=" + getUseUnlimitedThreads() +
-                    ", threadCountSuites=" + getThreadCountSuites() + ", threadCountClasses=" + getThreadCountClasses() +
-                    ", threadCountMethods=" + getThreadCountMethods() + ", parallelOptimized=" + isParallelOptimized();
+                + usedThreadCount + ", useUnlimitedThreads=" + getUseUnlimitedThreads()
+                + ", threadCountSuites=" + getThreadCountSuites()
+                + ", threadCountClasses=" + getThreadCountClasses()
+                + ", threadCountMethods=" + getThreadCountMethods()
+                + ", parallelOptimized=" + isParallelOptimized();
 
         getLog().info( message );
     }
@@ -1182,8 +1208,8 @@ public abstract class AbstractSurefireMojo
         {
             if ( !( getUseUnlimitedThreads() || getThreadCount() > 0 ^ getThreadCountSuites() > 0 ) )
             {
-                throw new MojoExecutionException( "Use threadCount or threadCountSuites > 0 or useUnlimitedThreads=true " +
-                        "for parallel='suites'" );
+                throw new MojoExecutionException(
+                        "Use threadCount or threadCountSuites > 0 or useUnlimitedThreads=true for parallel='suites'" );
             }
             setThreadCountClasses( 0 );
             setThreadCountMethods( 0 );
@@ -1192,8 +1218,9 @@ public abstract class AbstractSurefireMojo
         {
             if ( !( getUseUnlimitedThreads() || getThreadCount() > 0 ^ getThreadCountClasses() > 0 ) )
             {
-                throw new MojoExecutionException( "Use threadCount or threadCountClasses > 0 or useUnlimitedThreads=true " +
-                        "for parallel='classes'" );
+                throw new MojoExecutionException(
+                        "Use threadCount or threadCountClasses > 0 or useUnlimitedThreads=true for parallel='classes'"
+                      );
             }
             setThreadCountSuites( 0 );
             setThreadCountMethods( 0 );
@@ -1202,8 +1229,9 @@ public abstract class AbstractSurefireMojo
         {
             if ( !( getUseUnlimitedThreads() || getThreadCount() > 0 ^ getThreadCountMethods() > 0 ) )
             {
-                throw new MojoExecutionException( "Use threadCount or threadCountMethods > 0 or useUnlimitedThreads=true " +
-                        "for parallel='methods'" );
+                throw new MojoExecutionException(
+                        "Use threadCount or threadCountMethods > 0 or useUnlimitedThreads=true for parallel='methods'"
+                      );
             }
             setThreadCountSuites( 0 );
             setThreadCountClasses( 0 );
@@ -1219,12 +1247,12 @@ public abstract class AbstractSurefireMojo
                     || getThreadCount() > 0 && getThreadCountSuites() > 0 && getThreadCount() > getThreadCountSuites()
                         && getThreadCountClasses() == 0 && getThreadCountMethods() == 0 ) )
             {
-                throw new MojoExecutionException( "Use useUnlimitedThreads=true, " +
-                        "or only threadCount > 0, " +
-                        "or (threadCountSuites > 0 and threadCountClasses > 0), " +
-                        "or (threadCount > 0 and threadCountSuites > 0 and threadCountClasses > 0) " +
-                        "or (threadCount > 0 and threadCountSuites > 0 and threadCount > threadCountSuites) " +
-                        "for parallel='suitesAndClasses' or 'both'" );
+                throw new MojoExecutionException( "Use useUnlimitedThreads=true, "
+                        + "or only threadCount > 0, "
+                        + "or (threadCountSuites > 0 and threadCountClasses > 0), "
+                        + "or (threadCount > 0 and threadCountSuites > 0 and threadCountClasses > 0) "
+                        + "or (threadCount > 0 and threadCountSuites > 0 and threadCount > threadCountSuites) "
+                        + "for parallel='suitesAndClasses' or 'both'" );
             }
             setThreadCountMethods( 0 );
         }
@@ -1239,12 +1267,12 @@ public abstract class AbstractSurefireMojo
                     || getThreadCount() > 0 && getThreadCountSuites() > 0 && getThreadCount() > getThreadCountSuites()
                         && getThreadCountClasses() == 0 && getThreadCountMethods() == 0 ) )
             {
-                throw new MojoExecutionException( "Use useUnlimitedThreads=true, " +
-                        "or only threadCount > 0, " +
-                        "or (threadCountSuites > 0 and threadCountMethods > 0), " +
-                        "or (threadCount > 0 and threadCountSuites > 0 and threadCountMethods > 0), " +
-                        "or (threadCount > 0 and threadCountSuites > 0 and threadCount > threadCountSuites) " +
-                        "for parallel='suitesAndMethods'" );
+                throw new MojoExecutionException( "Use useUnlimitedThreads=true, "
+                        + "or only threadCount > 0, "
+                        + "or (threadCountSuites > 0 and threadCountMethods > 0), "
+                        + "or (threadCount > 0 and threadCountSuites > 0 and threadCountMethods > 0), "
+                        + "or (threadCount > 0 and threadCountSuites > 0 and threadCount > threadCountSuites) "
+                        + "for parallel='suitesAndMethods'" );
             }
             setThreadCountClasses( 0 );
         }
@@ -1259,12 +1287,12 @@ public abstract class AbstractSurefireMojo
                     || getThreadCount() > 0 && getThreadCountClasses() > 0 && getThreadCount() > getThreadCountClasses()
                         && getThreadCountSuites() == 0 && getThreadCountMethods() == 0 ) )
             {
-                throw new MojoExecutionException( "Use useUnlimitedThreads=true, " +
-                        "or only threadCount > 0, " +
-                        "or (threadCountClasses > 0 and threadCountMethods > 0), " +
-                        "or (threadCount > 0 and threadCountClasses > 0 and threadCountMethods > 0), " +
-                        "or (threadCount > 0 and threadCountClasses > 0 and threadCount > threadCountClasses) " +
-                        "for parallel='both' or parallel='classesAndMethods'" );
+                throw new MojoExecutionException( "Use useUnlimitedThreads=true, "
+                        + "or only threadCount > 0, "
+                        + "or (threadCountClasses > 0 and threadCountMethods > 0), "
+                        + "or (threadCount > 0 and threadCountClasses > 0 and threadCountMethods > 0), "
+                        + "or (threadCount > 0 and threadCountClasses > 0 and threadCount > threadCountClasses) "
+                        + "for parallel='both' or parallel='classesAndMethods'" );
             }
             setThreadCountSuites( 0 );
         }
@@ -1277,13 +1305,13 @@ public abstract class AbstractSurefireMojo
                         && getThreadCountMethods() == 0
                         && getThreadCount() > ( getThreadCountSuites() + getThreadCountClasses() ) ) )
             {
-                throw new MojoExecutionException( "Use useUnlimitedThreads=true, " +
-                        "or only threadCount > 0, " +
-                        "or (threadCountSuites > 0 and threadCountClasses > 0 and threadCountMethods > 0), " +
-                        "or every thread-count is specified, " +
-                        "or (threadCount > 0 and threadCountSuites > 0 and threadCountClasses > 0 " +
-                            "and threadCount > threadCountSuites + threadCountClasses) " +
-                        "for parallel='all'" );
+                throw new MojoExecutionException( "Use useUnlimitedThreads=true, "
+                        + "or only threadCount > 0, "
+                        + "or (threadCountSuites > 0 and threadCountClasses > 0 and threadCountMethods > 0), "
+                        + "or every thread-count is specified, "
+                        + "or (threadCount > 0 and threadCountSuites > 0 and threadCountClasses > 0 "
+                        + "and threadCount > threadCountSuites + threadCountClasses) "
+                        + "for parallel='all'" );
             }
         }
         else
@@ -1298,11 +1326,13 @@ public abstract class AbstractSurefireMojo
                 && getThreadCountMethods() == 0;
     }
 
-    private static void checkThreadCountEntity(int count, String entity) throws MojoExecutionException
+    private static void checkThreadCountEntity( int count, String entity )
+        throws MojoExecutionException
     {
         if ( count < 0 )
         {
-            throw new MojoExecutionException("parallel maven execution does not allow negative thread-count" + entity);
+            throw new MojoExecutionException(
+                    "parallel maven execution does not allow negative thread-count" + entity );
         }
     }
 
@@ -1389,13 +1419,14 @@ public abstract class AbstractSurefireMojo
             isTestNg ? new TestArtifactInfo( testNgArtifact.getVersion(), testNgArtifact.getClassifier() ) : null;
         List<File> testXml = getSuiteXmlFiles() != null ? Arrays.asList( getSuiteXmlFiles() ) : null;
         TestRequest testSuiteDefinition =
-            new TestRequest(testXml, getTestSourceDirectory(), getTest(), getTestMethod(),
-                             getRerunFailingTestsCount());
-        final boolean failIfNoTests;
+            new TestRequest( testXml, getTestSourceDirectory(), getTest(), getTestMethod(),
+                             getRerunFailingTestsCount() );
+
+        final boolean actualFailIfNoTests;
 
         if ( isValidSuiteXmlFileConfig() && getTest() == null )
         {
-            failIfNoTests = getFailIfNoTests() != null && getFailIfNoTests();
+            actualFailIfNoTests = getFailIfNoTests() != null && getFailIfNoTests();
             if ( !isTestNg )
             {
                 throw new MojoExecutionException( "suiteXmlFiles is configured, but there is no TestNG dependency" );
@@ -1405,25 +1436,25 @@ public abstract class AbstractSurefireMojo
         {
             if ( isSpecificTestSpecified() )
             {
-                failIfNoTests = getEffectiveFailIfNoTests();
-                setFailIfNoTests( failIfNoTests );
+                actualFailIfNoTests = getEffectiveFailIfNoTests();
+                setFailIfNoTests( actualFailIfNoTests );
             }
             else
             {
-                failIfNoTests = getFailIfNoTests() != null && getFailIfNoTests();
+                actualFailIfNoTests = getFailIfNoTests() != null && getFailIfNoTests();
             }
 
-            List<String> includes = getIncludeList();
-            List<String> excludes = getExcludeList();
+            List<String> actualIncludes = getIncludeList();
+            List<String> actualExcludes = getExcludeList();
             List<String> specificTests = getSpecificTests();
             directoryScannerParameters =
-                new DirectoryScannerParameters( getTestClassesDirectory(), includes, excludes, specificTests,
-                                                failIfNoTests, getRunOrder() );
+                new DirectoryScannerParameters( getTestClassesDirectory(), actualIncludes, actualExcludes,
+                                                specificTests, actualFailIfNoTests, getRunOrder() );
         }
 
         Properties providerProperties = getProperties();
 
-        return new ProviderConfiguration( directoryScannerParameters, runOrderParameters, failIfNoTests,
+        return new ProviderConfiguration( directoryScannerParameters, runOrderParameters, actualFailIfNoTests,
                                           reporterConfiguration, testNg, testSuiteDefinition, providerProperties, null,
                                           false );
     }
@@ -1442,7 +1473,6 @@ public abstract class AbstractSurefireMojo
 
         try
         {
-            provider.addProviderProperties();
             // cache the provider lookup
             String providerName = provider.getProviderName();
             Classpath providerClasspath = ClasspathCache.getCachedClassPath( providerName );
@@ -1455,7 +1485,7 @@ public abstract class AbstractSurefireMojo
             Artifact surefireArtifact = getCommonArtifact();
             Classpath inprocClassPath = providerClasspath.
                     addClassPathElementUrl( surefireArtifact.getFile().getAbsolutePath() )
-                    .addClassPathElementUrl( getApiArtifact().getFile().getAbsolutePath());
+                    .addClassPathElementUrl( getApiArtifact().getFile().getAbsolutePath() );
 
             final Classpath testClasspath = generateTestClasspath();
 
@@ -1515,7 +1545,8 @@ public abstract class AbstractSurefireMojo
         return getSuiteXmlFiles() != null && getSuiteXmlFiles().length > 0;
     }
 
-    @Nonnull private List<String> readListFromFile( @Nonnull final File file )
+    @SuppressWarnings( "checkstyle:modifierorder" )
+    private @Nonnull List<String> readListFromFile( @Nonnull final File file )
     {
         List<String> list;
 
@@ -1554,42 +1585,43 @@ public abstract class AbstractSurefireMojo
         }
     }
 
+    @SuppressWarnings( "checkstyle:modifierorder" )
     private @Nonnull List<String> getExcludeList()
     {
-        List<String> excludes = null;
+        List<String> actualExcludes = null;
         if ( isSpecificTestSpecified() )
         {
             // Check to see if we are running a single test. The raw parameter will
             // come through if it has not been set.
             // FooTest -> **/FooTest.java
 
-            excludes = new ArrayList<String>();
+            actualExcludes = new ArrayList<String>();
         }
         else
         {
             if ( getExcludesFile() != null )
             {
-                excludes = readListFromFile( getExcludesFile() );
+                actualExcludes = readListFromFile( getExcludesFile() );
             }
 
             // If we have excludesFile, and we have excludes, then append excludes to excludesFile content
-            if ( excludes == null )
+            if ( actualExcludes == null )
             {
-                excludes = this.getExcludes();
+                actualExcludes = this.getExcludes();
             }
             else
             {
-                maybeAppendList( excludes, this.getExcludes() );
+                maybeAppendList( actualExcludes, this.getExcludes() );
             }
 
             // defaults here, qdox doesn't like the end javadoc value
             // Have to wrap in an ArrayList as surefire expects an ArrayList instead of a List for some reason
-            if ( excludes == null || excludes.size() == 0 )
+            if ( actualExcludes == null || actualExcludes.size() == 0 )
             {
-                excludes = Arrays.asList( "**/*$*" );
+                actualExcludes = Arrays.asList( "**/*$*" );
             }
         }
-        return filterNulls( excludes );
+        return filterNulls( actualExcludes );
     }
 
     private List<String> getIncludeList()
@@ -1627,6 +1659,7 @@ public abstract class AbstractSurefireMojo
         return filterNulls( includes );
     }
 
+    @SuppressWarnings( "checkstyle:modifierorder" )
     private @Nonnull List<String> filterNulls( @Nonnull List<String> toFilter )
     {
         List<String> result = new ArrayList<String>( toFilter.size() );
@@ -1795,6 +1828,7 @@ public abstract class AbstractSurefireMojo
         }
     }
 
+    @SuppressWarnings( "checkstyle:emptyblock" )
     protected int getEffectiveForkCount()
     {
         if ( effectiveForkCount < 0 )
@@ -1823,15 +1857,7 @@ public abstract class AbstractSurefireMojo
         {
             double multiplier = Double.parseDouble( trimmed.substring( 0, trimmed.length() - 1 ) );
             double calculated = multiplier * ( (double) Runtime.getRuntime().availableProcessors() );
-
-            if ( calculated > 0d )
-            {
-                return Math.max( (int) calculated, 1 );
-            }
-            else
-            {
-                return 0;
-            }
+            return calculated > 0d ? Math.max( (int) calculated, 1 ) : 0;
         }
         else
         {
@@ -1844,7 +1870,8 @@ public abstract class AbstractSurefireMojo
         String debugForkedProcess = getDebugForkedProcess();
         if ( "true".equals( debugForkedProcess ) )
         {
-            return "-Xdebug -Xnoagent -Djava.compiler=NONE -Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005";
+            return "-Xdebug -Xnoagent -Djava.compiler=NONE"
+                + " -Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005";
         }
         return debugForkedProcess;
     }
@@ -2021,7 +2048,8 @@ public abstract class AbstractSurefireMojo
 
         if ( getClasspathDependencyExcludes() != null )
         {
-            ArtifactFilter dependencyFilter = new PatternIncludesArtifactFilter( Arrays.asList( getClasspathDependencyExcludes() ) );
+            ArtifactFilter dependencyFilter =
+                new PatternIncludesArtifactFilter( Arrays.asList( getClasspathDependencyExcludes() ) );
             classpathArtifacts = this.filterArtifacts( classpathArtifacts, dependencyFilter );
         }
 
@@ -2153,8 +2181,8 @@ public abstract class AbstractSurefireMojo
                 Artifact artifact = (Artifact) o;
 
                 getLog().debug(
-                    "Adding to " + getPluginName() + " booter test classpath: " + artifact.getFile().getAbsolutePath() +
-                        " Scope: " + artifact.getScope() );
+                    "Adding to " + getPluginName() + " booter test classpath: " + artifact.getFile().getAbsolutePath()
+                    + " Scope: " + artifact.getScope() );
 
                 items.add( artifact.getFile().getAbsolutePath() );
             }
@@ -2266,7 +2294,8 @@ public abstract class AbstractSurefireMojo
             if ( junitArtifact != null )
             {
                 throw new MojoFailureException( "groups/excludedGroups are specified but JUnit version on classpath"
-                                                    + " is too old to support groups. Check your dependency:tree to see if your project is picking up an old junit version" );
+                        + " is too old to support groups. Check your dependency:tree to see if your project"
+                        + " is picking up an old junit version" );
             }
             throw new MojoFailureException(
                 "groups/excludedGroups require TestNG or JUnit48+ on project test classpath" );
@@ -2284,6 +2313,7 @@ public abstract class AbstractSurefireMojo
             this.testNgArtifact = testNgArtifact;
         }
 
+        @SuppressWarnings( "checkstyle:modifierorder" )
         public @Nonnull String getProviderName()
         {
             return "org.apache.maven.surefire.testng.TestNGProvider";
@@ -2419,6 +2449,10 @@ public abstract class AbstractSurefireMojo
 
     }
 
+    /**
+     * Provides the Provider information for manually configured providers
+     *
+     */
     public class DynamicProviderInfo
         implements ConfigurableProviderInfo
     {
@@ -2462,7 +2496,6 @@ public abstract class AbstractSurefireMojo
         }
 
     }
-
 
     public abstract List<String> getIncludes();
 
@@ -2684,16 +2717,9 @@ public abstract class AbstractSurefireMojo
         this.excludedGroups = excludedGroups;
     }
 
-    public File[] getSuiteXmlFiles()
-    {
-        return suiteXmlFiles;
-    }
+    public abstract File[] getSuiteXmlFiles();
 
-    @SuppressWarnings( "UnusedDeclaration" )
-    public void setSuiteXmlFiles( File[] suiteXmlFiles )
-    {
-        this.suiteXmlFiles = suiteXmlFiles;
-    }
+    public abstract void setSuiteXmlFiles( File[] suiteXmlFiles );
 
     public String getJunitArtifactName()
     {
@@ -2932,16 +2958,9 @@ public abstract class AbstractSurefireMojo
         return parallelMavenExecution != null && parallelMavenExecution;
     }
 
-    public String getRunOrder()
-    {
-        return runOrder;
-    }
+    public abstract String getRunOrder();
 
-    @SuppressWarnings( "UnusedDeclaration" )
-    public void setRunOrder( String runOrder )
-    {
-        this.runOrder = runOrder;
-    }
+    public abstract void setRunOrder( String runOrder );
 
     public String[] getDependenciesToScan()
     {

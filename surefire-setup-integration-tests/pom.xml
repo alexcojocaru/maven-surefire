@@ -24,11 +24,10 @@
   <parent>
     <groupId>org.apache.maven.surefire</groupId>
     <artifactId>surefire</artifactId>
-    <version>2.18-dalvizu</version>
+    <version>2.18.1-dalvizu</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
 
-  <groupId>org.apache.maven.surefire</groupId>
   <artifactId>surefire-setup-integration-tests</artifactId>
 
   <name>Maven Surefire Integration Test Setup</name>
@@ -115,7 +114,7 @@
     <plugins>
       <plugin>
         <artifactId>maven-help-plugin</artifactId>
-        <version>2.1</version>
+        <version>2.2</version>
         <executions>
           <execution>
             <id>settings.xml</id>
@@ -169,7 +168,7 @@
             <extraArtifact>org.apache.maven.plugins:maven-jar-plugin:2.3.2</extraArtifact>
             <extraArtifact>org.apache.commons:commons-email:1.2</extraArtifact>
             <extraArtifact>org.codehaus.mojo:build-helper-maven-plugin:1.2</extraArtifact>
-            <extraArtifact>org.apache.maven.reporting:maven-reporting-api:2.0.9</extraArtifact>
+            <extraArtifact>org.apache.maven.reporting:maven-reporting-api:2.2.1</extraArtifact>
             <extraArtifact>commons-collections:commons-collections:3.2</extraArtifact>
             <extraArtifact>commons-logging:commons-logging:1.0.4</extraArtifact>
             <extraArtifact>xml-apis:xml-apis:1.0.b2</extraArtifact>
@@ -220,7 +219,7 @@
           <dependency>
             <groupId>org.apache.maven.surefire</groupId>
             <artifactId>surefire-shadefire</artifactId>
-            <version>${shadedVersion}</version>
+            <version>2.12.4</version> <!-- ${shadedVersion}, but resolved due to http://jira.codehaus.org/browse/MRELEASE-799 -->
           </dependency>
         </dependencies>
       </plugin>

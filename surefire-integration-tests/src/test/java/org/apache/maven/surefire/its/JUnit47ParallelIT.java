@@ -26,7 +26,7 @@ import org.junit.Test;
 /**
  * Testing JUnitCoreWrapper with ParallelComputerBuilder.
  *
- * @author <a href="mailto:tibor.digana@gmail.com">Tibor Digana (tibor17)</a>
+ * @author <a href="mailto:tibordigana@apache.org">Tibor Digana (tibor17)</a>
  * @since 2.16
  */
 public class JUnit47ParallelIT
@@ -519,6 +519,17 @@ public class JUnit47ParallelIT
             1 ).parallelTestsTimeoutForcedInSeconds( 2.5d ).setTestToRun(
             "TestClass" ).failNever().executeTest().verifyTextInLog(
             "The test run has finished abruptly after timeout of 1.0 seconds." );
+    }
+
+    @Test
+    public void forcedShutdownVerifyingLogs()
+    {
+        // executes for 2.5 sec until timeout has elapsed
+        unpack().parallelMethods().threadCountMethods( 3 ).disablePerCoreThreadCount()
+            .parallelTestsTimeoutForcedInSeconds( 1.05d ).setTestToRun( "Waiting*Test" ).failNever().executeTest()
+            .verifyTextInLog( "The test run has finished abruptly after timeout of 1.05 seconds." )
+            .verifyTextInLog( "These tests were executed in prior to the shutdown operation:" )
+            .verifyTextInLog( "These tests are incomplete:" );
     }
 
     private SurefireLauncher unpack()

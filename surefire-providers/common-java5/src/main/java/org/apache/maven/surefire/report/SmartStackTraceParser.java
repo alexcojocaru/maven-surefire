@@ -33,6 +33,8 @@ import org.apache.maven.shared.utils.StringUtils;
 public class SmartStackTraceParser
 {
 
+    private static final int MAX_LINE_LENGTH = 77;
+
     private final SafeThrowable throwable;
 
     private final StackTraceElement[] stackTrace;
@@ -64,7 +66,8 @@ public class SmartStackTraceParser
     {
         try
         {
-            return Thread.currentThread().getContextClassLoader().loadClass( name );
+            ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+            return classLoader != null ? classLoader.loadClass( name ) : null;
         }
         catch ( ClassNotFoundException e )
         {
@@ -93,7 +96,7 @@ public class SmartStackTraceParser
         if ( stackTraceElements.isEmpty() )
         {
             result.append( simpleName );
-            if (StringUtils.isNotEmpty( testMethodName ))
+            if ( StringUtils.isNotEmpty( testMethodName ) )
             {
                 result.append( "." ).append( testMethodName );
             }
@@ -149,7 +152,7 @@ public class SmartStackTraceParser
         {
             result.append( rootIsInclass() ? " " : " » " );
             result.append( getMinimalThrowableMiniMessage( target ) );
-            result.append( getTruncatedMessage( 77 - result.length() ) );
+            result.append( getTruncatedMessage( MAX_LINE_LENGTH - result.length() ) );
         }
         return result.toString();
     }

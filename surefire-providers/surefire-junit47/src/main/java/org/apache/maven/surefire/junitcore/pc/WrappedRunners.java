@@ -43,4 +43,9 @@ final class WrappedRunners
         this.wrappingSuite = wrappingSuite;
         this.embeddedChildrenCount = embeddedChildrenCount;
     }
+
+    WrappedRunners()
+    {
+        this( null, 0 );
+    }
 }

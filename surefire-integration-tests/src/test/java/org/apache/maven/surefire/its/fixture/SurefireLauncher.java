@@ -270,7 +270,7 @@ public class SurefireLauncher
 
     public SurefireLauncher runOrder( String runOrder )
     {
-        mavenLauncher.sysProp( "runOrder", runOrder );
+        mavenLauncher.sysProp( "surefire.runOrder", runOrder );
         return this;
     }
 
@@ -402,6 +402,12 @@ public class SurefireLauncher
     public SurefireLauncher parallelTestsTimeoutForcedInSeconds( double timeout )
     {
         mavenLauncher.sysProp( "surefire.parallel.forcedTimeout", timeout );
+        return this;
+    }
+
+    public SurefireLauncher argLine( String value )
+    {
+        mavenLauncher.sysProp( "argLine", value );
         return this;
     }
 

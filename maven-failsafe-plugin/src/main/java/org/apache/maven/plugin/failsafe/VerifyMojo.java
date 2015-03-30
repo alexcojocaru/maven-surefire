@@ -60,8 +60,8 @@ public class VerifyMojo
     private boolean skipTests;
 
     /**
-     * Set this to 'true' to skip running integration tests, but still compile them. Its use is NOT RECOMMENDED, but quite
-     * convenient on occasion.
+     * Set this to 'true' to skip running integration tests, but still compile them. Its use is NOT RECOMMENDED, but
+     * quite convenient on occasion.
      *
      * @since 2.4.3-alpha-2
      */
@@ -162,7 +162,8 @@ public class VerifyMojo
                 {
                     getLog().warn(
                         "File encoding has not been set, using platform encoding " + ReaderFactory.FILE_ENCODING
-                            + ", i.e. build is platform dependent!" );
+                            + ", i.e. build is platform dependent! The file encoding for reports output files "
+                            + "should be provided by the POM property ${project.reporting.outputEncoding}." );
                     encoding = ReaderFactory.FILE_ENCODING;
                 }
                 else

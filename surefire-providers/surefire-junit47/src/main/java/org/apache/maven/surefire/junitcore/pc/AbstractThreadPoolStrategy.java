@@ -19,11 +19,13 @@ package org.apache.maven.surefire.junitcore.pc;
  * under the License.
  */
 
+import org.apache.maven.surefire.report.ConsoleLogger;
+
 import java.util.Collection;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Abstract parallel scheduling strategy in private package.
@@ -43,15 +45,16 @@ abstract class AbstractThreadPoolStrategy
 
     private final Collection<Future<?>> futureResults;
 
-    private final AtomicBoolean canSchedule = new AtomicBoolean( true );
+    private volatile boolean isDestroyed;
 
-    AbstractThreadPoolStrategy( ExecutorService threadPool )
+    AbstractThreadPoolStrategy( ConsoleLogger logger, ExecutorService threadPool )
     {
-        this( threadPool, null );
+        this( logger, threadPool, null );
     }
 
-    AbstractThreadPoolStrategy( ExecutorService threadPool, Collection<Future<?>> futureResults )
+    AbstractThreadPoolStrategy( ConsoleLogger logger, ExecutorService threadPool, Collection<Future<?>> futureResults )
     {
+        super( logger );
         this.threadPool = threadPool;
         this.futureResults = futureResults;
     }
@@ -64,11 +67,6 @@ abstract class AbstractThreadPoolStrategy
     protected final Collection<Future<?>> getFutureResults()
     {
         return futureResults;
-    }
-
-    protected final void disable()
-    {
-        canSchedule.set( false );
     }
 
     @Override
@@ -87,7 +85,7 @@ abstract class AbstractThreadPoolStrategy
     @Override
     protected boolean stop()
     {
-        boolean wasRunning = canSchedule.getAndSet( false );
+        boolean wasRunning = disable();
         if ( threadPool.isShutdown() )
         {
             wasRunning = false;
@@ -102,7 +100,7 @@ abstract class AbstractThreadPoolStrategy
     @Override
     protected boolean stopNow()
     {
-        boolean wasRunning = canSchedule.getAndSet( false );
+        boolean wasRunning = disable();
         if ( threadPool.isShutdown() )
         {
             wasRunning = false;
@@ -114,6 +112,9 @@ abstract class AbstractThreadPoolStrategy
         return wasRunning;
     }
 
+    /**
+     * @see Scheduler.ShutdownHandler
+     */
     @Override
     protected void setDefaultShutdownHandler( Scheduler.ShutdownHandler handler )
     {
@@ -125,9 +126,21 @@ abstract class AbstractThreadPoolStrategy
         }
     }
 
-    @Override
-    public final boolean canSchedule()
+    public boolean destroy()
     {
-        return canSchedule.get();
+        try
+        {
+            if ( !isDestroyed )//just an optimization
+            {
+                disable();
+                threadPool.shutdown();
+                this.isDestroyed |= threadPool.awaitTermination( Long.MAX_VALUE, TimeUnit.NANOSECONDS );
+            }
+            return isDestroyed;
+        }
+        catch ( InterruptedException e )
+        {
+            return false;
+        }
     }
 }

@@ -26,9 +26,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.ResourceBundle;
-import org.apache.maven.doxia.siterenderer.Renderer;
 import org.apache.maven.model.ReportPlugin;
-import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.reporting.AbstractMavenReport;
@@ -45,35 +43,11 @@ public abstract class AbstractSurefireReportMojo
     extends AbstractMavenReport
 {
     /**
-     * Location where generated html will be created.
-     *
-     * @noinspection UnusedDeclaration
-     */
-    @Parameter(property = "project.reporting.outputDirectory")
-    private File outputDirectory;
-
-    /**
-     * Doxia Site Renderer
-     *
-     * @noinspection UnusedDeclaration
-     */
-    @Component
-    private Renderer siteRenderer;
-
-    /**
-     * Maven Project
-     *
-     * @noinspection UnusedDeclaration
-     */
-    @Parameter(property = "project", required = true, readonly = true)
-    private MavenProject project;
-
-    /**
      * If set to false, only failures are shown.
      *
      * @noinspection UnusedDeclaration
      */
-    @Parameter(defaultValue = "true", required = true, property = "showSuccess")
+    @Parameter( defaultValue = "true", required = true, property = "showSuccess" )
     private boolean showSuccess;
 
     /**
@@ -85,7 +59,8 @@ public abstract class AbstractSurefireReportMojo
     private File[] reportsDirectories;
 
     /**
-     * (Deprecated, use reportsDirectories) This directory contains the XML Report files that will be parsed and rendered to HTML format.
+     * (Deprecated, use reportsDirectories) This directory contains the XML Report files that will be parsed and
+     * rendered to HTML format.
      *
      * @noinspection UnusedDeclaration
      */
@@ -98,7 +73,7 @@ public abstract class AbstractSurefireReportMojo
      *
      * @noinspection MismatchedQueryAndUpdateOfCollection, UnusedDeclaration
      */
-    @Parameter(property = "reactorProjects", readonly = true)
+    @Parameter( defaultValue = "${reactorProjects}", readonly = true )
     private List<MavenProject> reactorProjects;
 
     /**
@@ -106,7 +81,7 @@ public abstract class AbstractSurefireReportMojo
      *
      * @noinspection UnusedDeclaration
      */
-    @Parameter(defaultValue = "${project.reporting.outputDirectory}/xref-test")
+    @Parameter( defaultValue = "${project.reporting.outputDirectory}/xref-test" )
     private File xrefLocation;
 
     /**
@@ -114,7 +89,7 @@ public abstract class AbstractSurefireReportMojo
      *
      * @noinspection UnusedDeclaration
      */
-    @Parameter(defaultValue = "true", property = "linkXRef")
+    @Parameter( defaultValue = "true", property = "linkXRef" )
     private boolean linkXRef;
 
     /**
@@ -122,7 +97,7 @@ public abstract class AbstractSurefireReportMojo
      *
      * @noinspection UnusedDeclaration
      */
-    @Parameter(defaultValue = "false", property = "aggregate")
+    @Parameter( defaultValue = "false", property = "aggregate" )
     private boolean aggregate;
 
     /**
@@ -358,31 +333,7 @@ public abstract class AbstractSurefireReportMojo
     /**
      * {@inheritDoc}
      */
-    protected Renderer getSiteRenderer()
-    {
-        return siteRenderer;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    protected MavenProject getProject()
-    {
-        return project;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
     public abstract String getOutputName();
-
-    /**
-     * {@inheritDoc}
-     */
-    protected String getOutputDirectory()
-    {
-        return outputDirectory.getAbsolutePath();
-    }
 
     private ResourceBundle getBundle( Locale locale )
     {

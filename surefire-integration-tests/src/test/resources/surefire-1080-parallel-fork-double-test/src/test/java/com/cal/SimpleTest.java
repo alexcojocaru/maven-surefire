@@ -1,4 +1,4 @@
-package org.apache.maven.surefire.its.jiras;
+package com.cal;
 
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -19,27 +19,28 @@ package org.apache.maven.surefire.its.jiras;
  * under the License.
  */
 
-import org.apache.maven.surefire.its.fixture.SurefireJUnit4IntegrationTestCase;
 import org.junit.Test;
 
-/**
- * SUREFIRE-674 Asserts that the build fails when tests have errors
- *
- * @author Kristian Rosenvold
- */
-public class Surefire763EnvironmentForkModeIT
-    extends SurefireJUnit4IntegrationTestCase
+import static org.junit.Assert.assertEquals;
+
+public class SimpleTest
 {
+
+    /**
+     * Make sure the universe hasn't broken.
+     */
     @Test
-    public void testWhenUseSystemClassLoader()
+    public void testAddition()
     {
-        unpack( "/environment-variables" ).addGoal( "-DuseSystemClassLoader=true" ).executeTest();
+        assertEquals( 2, 1 + 1 );
     }
 
-    @Test
-    public void testWhenDontUseSystemClassLoader()
+    /**
+     * Now try to break the universe :D
+     */
+    @Test(expected = ArithmeticException.class)
+    public void testDivision()
     {
-        unpack( "/environment-variables" ).addGoal( "-DuseSystemClassLoader=false" ).executeTest();
+        int i = 1 / 0;
     }
-
 }

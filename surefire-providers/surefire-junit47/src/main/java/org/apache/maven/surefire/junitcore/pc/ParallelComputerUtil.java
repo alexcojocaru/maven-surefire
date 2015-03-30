@@ -21,6 +21,11 @@ package org.apache.maven.surefire.junitcore.pc;
 
 import org.apache.maven.surefire.junitcore.JUnitCoreParameters;
 import org.apache.maven.surefire.testset.TestSetFailedException;
+import org.junit.runner.Description;
+
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Iterator;
 
 /**
  * An algorithm which configures {@link ParallelComputer} with allocated thread resources by given
@@ -33,6 +38,10 @@ import org.apache.maven.surefire.testset.TestSetFailedException;
  */
 final class ParallelComputerUtil
 {
+    private static final Collection<Description> UNUSED_DESCRIPTIONS =
+            Arrays.asList( null, Description.createSuiteDescription( "null" ), Description.TEST_MECHANISM,
+                    Description.EMPTY );
+
     private static int availableProcessors = Runtime.getRuntime().availableProcessors();
 
     private ParallelComputerUtil()
@@ -66,9 +75,10 @@ final class ParallelComputerUtil
 
         if ( !params.isUseUnlimitedThreads() && !hasThreadCount( params ) && !hasThreadCounts( params ) )
         {
-            throw new TestSetFailedException( "Unspecified thread-count(s). " +
-                                                  "See the parameters " + JUnitCoreParameters.USEUNLIMITEDTHREADS_KEY
-                                                  + ", " + JUnitCoreParameters.THREADCOUNT_KEY + ", "
+            throw new TestSetFailedException( "Unspecified thread-count(s). "
+                                                  + "See the parameters "
+                                                  + JUnitCoreParameters.USEUNLIMITEDTHREADS_KEY + ", "
+                                                  + JUnitCoreParameters.THREADCOUNT_KEY + ", "
                                                   + JUnitCoreParameters.THREADCOUNTSUITES_KEY + ", "
                                                   + JUnitCoreParameters.THREADCOUNTCLASSES_KEY + ", "
                                                   + JUnitCoreParameters.THREADCOUNTMETHODS_KEY + "." );
@@ -94,6 +104,37 @@ final class ParallelComputerUtil
         else
         {
             return concurrencyFromThreadCounts( params );
+        }
+    }
+
+    static boolean isUnusedDescription( Description examined )
+    {
+        if ( UNUSED_DESCRIPTIONS.contains( examined ) )
+        {
+            return true;
+        }
+        else
+        {
+            // UNUSED_DESCRIPTIONS ensures that "examined" cannot be null
+            for ( Description unused : UNUSED_DESCRIPTIONS )
+            {
+                if ( unused != null && unused.getDisplayName().equals( examined.getDisplayName() ) )
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
+    static void removeUnusedDescriptions( Collection<Description> examined )
+    {
+        for ( Iterator<Description> it = examined.iterator(); it.hasNext(); )
+        {
+            if ( isUnusedDescription( it.next() ) )
+            {
+                it.remove();
+            }
         }
     }
 
@@ -292,9 +333,9 @@ final class ParallelComputerUtil
 
     private static boolean hasThreadCounts( JUnitCoreParameters jUnitCoreParameters )
     {
-        return jUnitCoreParameters.isParallelSuites() && jUnitCoreParameters.getThreadCountSuites() > 0 ||
-            jUnitCoreParameters.isParallelClasses() && jUnitCoreParameters.getThreadCountClasses() > 0 ||
-            jUnitCoreParameters.isParallelMethods() && jUnitCoreParameters.getThreadCountMethods() > 0;
+        return ( jUnitCoreParameters.isParallelSuites() && jUnitCoreParameters.getThreadCountSuites() > 0 )
+            || ( jUnitCoreParameters.isParallelClasses() && jUnitCoreParameters.getThreadCountClasses() > 0 )
+            || ( jUnitCoreParameters.isParallelMethods() && jUnitCoreParameters.getThreadCountMethods() > 0 );
     }
 
     private static boolean hasThreadCount( JUnitCoreParameters jUnitCoreParameters )

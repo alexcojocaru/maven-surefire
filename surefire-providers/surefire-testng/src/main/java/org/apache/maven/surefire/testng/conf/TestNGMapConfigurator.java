@@ -50,10 +50,10 @@ public class TestNGMapConfigurator
         throws TestSetFailedException
     {
         Map convertedOptions = getConvertedOptions( options );
-        for (Object key : convertedOptions.keySet())
+        for ( Object key : convertedOptions.keySet() )
         {
-            String keyAsString = (String)key;
-            System.out.println("Key: " + keyAsString + ", value=" + convertedOptions.get(key).toString());
+            String keyAsString = (String) key;
+            System.out.println( "Key: " + keyAsString + ", value=" + convertedOptions.get( key ).toString() );
         }
         testng.configure( convertedOptions );
     }
@@ -66,7 +66,8 @@ public class TestNGMapConfigurator
         suite.setThreadCount( threadCount );
 
         String parallel = (String) options.get( ProviderParameterNames.PARALLEL_PROP );
-        if ( parallel != null ) {
+        if ( parallel != null )
+        {
             suite.setParallel( parallel );
         }
     }
